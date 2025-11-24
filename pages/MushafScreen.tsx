@@ -85,7 +85,7 @@ const MushafScreen = () => {
       </div>
 
       {/* Mushaf Page */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-10 bg-[#FDFCF8]">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-10 bg-[#FDFCF8] pb-28 md:pb-10">
         {loading ? (
            <div className="flex flex-col items-center justify-center h-full text-teal-600">
               <Loader2 size={40} className="animate-spin mb-4" />
@@ -202,7 +202,7 @@ const SurahList = ({ surahs, loading, onSelect }: { surahs: Surah[], loading: bo
         </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-24">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-28">
         {loading ? (
             <div className="flex flex-col items-center justify-center py-32 text-slate-400">
                <Loader2 size={40} className="animate-spin mb-4 text-teal-500" />

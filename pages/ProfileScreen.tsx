@@ -32,7 +32,7 @@ const ProfileScreen = () => {
   );
 
   return (
-    <div className="flex-1 bg-[#FDFCF8] flex flex-col overflow-y-auto pb-24">
+    <div className="flex-1 bg-[#FDFCF8] flex flex-col overflow-y-auto pb-28">
       {/* Header */}
       <div className="bg-white px-6 pt-8 pb-6 border-b border-slate-100 flex flex-col items-center relative overflow-hidden">
         <div className="absolute top-0 w-full h-32 bg-slate-900"></div>

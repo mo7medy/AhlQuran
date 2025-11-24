@@ -151,7 +151,7 @@ const MemorizationScreen = () => {
       </header>
 
       {/* CONTENT */}
-      <main className="flex-1 overflow-y-auto relative">
+      <main className="flex-1 overflow-y-auto relative pb-28 md:pb-0">
         
         {/* VIEW 1: SETUP */}
         {sessionState === 'setup' && (

@@ -168,7 +168,7 @@ const AIScreen = () => {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white border-t border-slate-100 relative z-20">
+      <div className="p-4 pb-28 md:pb-4 bg-white border-t border-slate-100 relative z-20">
           
           {/* Suggestions (only show if few messages) */}
           {messages.length < 3 && (

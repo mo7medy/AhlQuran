@@ -102,7 +102,7 @@ const TeacherProfileScreen = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24 relative custom-scrollbar">
+      <div className="flex-1 overflow-y-auto pb-28 relative custom-scrollbar">
         {/* Profile Info */}
         <div className="px-6 mt-4 mb-8">
            <div className="flex flex-col items-center">
@@ -198,7 +198,7 @@ const TeacherProfileScreen = () => {
 
       {/* CHAT OVERLAY */}
       {isChatOpen && (
-        <div className="absolute inset-0 z-50 bg-white flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="absolute inset-0 z-[60] bg-white flex flex-col animate-in slide-in-from-right duration-300">
            <div className="bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 flex items-center justify-between shadow-sm pt-safe">
              <div className="flex items-center gap-4">
                <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
@@ -252,7 +252,7 @@ const TeacherProfileScreen = () => {
 
       {/* PAYMENT MODAL */}
       {showPayment && (
-        <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center animate-in fade-in duration-300">
+        <div className="absolute inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center animate-in fade-in duration-300">
            <div className="bg-white w-full md:w-[480px] md:rounded-[2rem] rounded-t-[2rem] p-8 shadow-2xl animate-in slide-in-from-bottom-20 duration-500">
              
              {paymentSuccess ? (

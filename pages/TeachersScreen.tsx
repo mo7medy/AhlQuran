@@ -35,7 +35,7 @@ const TeachersScreen = () => {
         </div>
       </div>
 
-      <div className="px-6 pb-24 overflow-y-auto custom-scrollbar space-y-4">
+      <div className="px-6 pb-28 overflow-y-auto custom-scrollbar space-y-4">
         {MOCK_TEACHERS.map((teacher) => (
           <div 
             key={teacher.uid} 
