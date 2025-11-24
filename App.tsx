@@ -41,7 +41,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={!user ? <LandingScreen /> : <Navigate to="/dashboard" />} />
+      <Route path="/" element={<LandingScreen />} />
       <Route path="/auth" element={!user ? <AuthScreen /> : <Navigate to="/dashboard" />} />
       
       {/* Protected Routes */}

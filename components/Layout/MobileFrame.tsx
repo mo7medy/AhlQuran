@@ -7,12 +7,15 @@ const ResponsiveLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  
+  const isLanding = location.pathname === '/';
 
-  // If user is not logged in, just render children without sidebar (e.g., Landing Page)
-  if (!user) {
+  // If user is not logged in OR we are on the landing page, render full screen scrollable layout without sidebar
+  if (!user || isLanding) {
       return (
-          <div className="flex h-[100dvh] w-full bg-[#FDFCF8] overflow-hidden text-slate-900">
-             <main className="flex-1 flex flex-col h-full overflow-hidden relative w-full bg-[#FDFCF8]">
+          <div className="flex h-[100dvh] w-full bg-[#FDFCF8] text-slate-900">
+             {/* Changed overflow-hidden to overflow-y-auto to allow landing page scrolling */}
+             <main className="flex-1 flex flex-col h-full w-full bg-[#FDFCF8] overflow-y-auto relative">
                 {children}
              </main>
           </div>
