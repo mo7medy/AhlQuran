@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ayah, Surah } from '../types';
 import { fetchSurahList, fetchSurahDetails } from '../services/quranApi';
-import { ChevronLeft, Play, Pause, Settings, Search, BookOpen, Volume2, Info, Loader2 } from 'lucide-react';
+import { ChevronLeft, Play, Pause, Search, BookOpen, Loader2, ArrowRight } from 'lucide-react';
 
 const MushafScreen = () => {
   const [surahs, setSurahs] = useState<Surah[]>([]);
   const [selectedSurah, setSelectedSurah] = useState<Surah | null>(null);
   const [ayahs, setAyahs] = useState<Ayah[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fontSize, setFontSize] = useState(28);
+  const [fontSize, setFontSize] = useState(32);
   const [playingAyah, setPlayingAyah] = useState<number | null>(null);
   const [showTafsir, setShowTafsir] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -63,19 +63,20 @@ const MushafScreen = () => {
   return (
     <div className="flex flex-col h-full bg-[#faf7f0] relative">
       {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm z-30 sticky top-0 border-b border-gray-100">
-        <button onClick={() => { setSelectedSurah(null); setPlayingAyah(null); }} className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600">
+      <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm z-30 sticky top-0 border-b border-slate-100">
+        <button onClick={() => { setSelectedSurah(null); setPlayingAyah(null); }} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
           <ChevronLeft size={24} />
-          <span className="hidden md:inline font-medium">Surah List</span>
         </button>
+        
         <div className="text-center">
-          <h2 className="font-bold text-lg text-gray-800">{selectedSurah.name}</h2>
-          <p className="text-xs text-gray-500">{selectedSurah.englishName}</p>
+          <h2 className="font-bold text-lg text-slate-900">{selectedSurah.name}</h2>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{selectedSurah.englishName}</p>
         </div>
-        <div className="flex gap-1">
+        
+        <div className="flex gap-2">
             <button 
               onClick={toggleTafsir}
-              className={`p-2 rounded-full transition-colors ${showTafsir ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-gray-100 text-gray-600'}`} 
+              className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 ${showTafsir ? 'bg-teal-100 text-teal-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`} 
               title="Toggle Tafsir"
             >
                 <BookOpen size={20} />
@@ -84,49 +85,58 @@ const MushafScreen = () => {
       </div>
 
       {/* Mushaf Page */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-8">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-10 bg-[#FDFCF8]">
         {loading ? (
-           <div className="flex flex-col items-center justify-center h-full text-emerald-600">
-              <Loader2 size={40} className="animate-spin mb-2" />
-              <p className="text-sm font-medium">Loading Quran Data...</p>
+           <div className="flex flex-col items-center justify-center h-full text-teal-600">
+              <Loader2 size={40} className="animate-spin mb-4" />
+              <p className="text-sm font-bold uppercase tracking-widest">Loading Text...</p>
            </div>
         ) : (
-          <div className="max-w-4xl mx-auto bg-white shadow-md border border-gray-100 rounded-xl md:rounded-2xl p-4 md:p-12 min-h-[80vh]">
+          <div className="max-w-4xl mx-auto bg-white shadow-xl shadow-slate-200/50 rounded-3xl p-6 md:p-16 min-h-[80vh] relative border border-slate-50">
             
             {/* Bismillah */}
             {selectedSurah.number !== 1 && selectedSurah.number !== 9 && (
-              <div className="text-center mb-10 mt-2">
-                 <span className="font-quran text-3xl text-gray-800 block mb-4">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</span>
-                 <div className="h-[1px] w-32 bg-amber-300 mx-auto opacity-50"></div>
+              <div className="text-center mb-12 mt-4">
+                 <span className="font-quran text-3xl text-slate-800 block mb-6">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</span>
+                 <div className="h-[2px] w-24 bg-amber-400 mx-auto rounded-full opacity-40"></div>
               </div>
             )}
             
             {/* Quran Text Container */}
-            <div className={`leading-[2.8] ${showTafsir ? 'space-y-8' : 'text-justify'} `} style={{ direction: 'rtl' }}>
+            <div className={`leading-[2.8] ${showTafsir ? 'space-y-10' : 'text-justify'} `} style={{ direction: 'rtl' }}>
                {ayahs.map((ayah) => (
                  <React.Fragment key={ayah.number}>
                     {showTafsir ? (
                       // Tafsir Mode: List View
-                      <div className="border-b border-gray-50 pb-6 mb-6 last:border-0">
-                         <div className="flex gap-4 items-start">
+                      <div className="border-b border-slate-50 pb-8 mb-8 last:border-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                         <div className="flex gap-6 items-start">
                              <button 
                                 onClick={() => toggleAudio(ayah)}
-                                className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center border transition-colors mt-2 ${playingAyah === ayah.number ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-emerald-600'}`}
+                                className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center border transition-all mt-2 ${playingAyah === ayah.number ? 'bg-teal-500 border-teal-500 text-white shadow-lg shadow-teal-500/30' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-teal-600 hover:border-teal-200'}`}
                              >
-                               {playingAyah === ayah.number ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                               {playingAyah === ayah.number ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                              </button>
+                             
                              <div className="flex-1">
-                                <p className="font-quran text-3xl text-gray-800 mb-4 leading-loose">{ayah.text}</p>
-                                <div className="text-base text-gray-600 font-sans ltr text-left bg-gray-50 p-4 rounded-lg border border-gray-100">
-                                   <p className="font-semibold text-emerald-800 mb-1 text-xs uppercase tracking-wider">Translation</p>
-                                   <p className="mb-3">{ayah.translation}</p>
-                                   <div className="h-[1px] bg-gray-200 w-full my-3"></div>
-                                   <p className="font-semibold text-amber-700 mb-1 text-xs uppercase tracking-wider">Tafsir (Al-Muyassar)</p>
-                                   <p className="text-right font-serif text-gray-700 leading-relaxed" dir="rtl">{ayah.tafsir}</p>
+                                <p className="font-quran text-3xl md:text-4xl text-slate-800 mb-6 leading-[2.5]">{ayah.text}</p>
+                                
+                                <div className="text-base font-sans ltr text-left bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                   <div className="flex items-center gap-2 mb-2">
+                                     <div className="w-1 h-4 bg-teal-500 rounded-full"></div>
+                                     <p className="font-bold text-slate-900 text-xs uppercase tracking-wider">Translation</p>
+                                   </div>
+                                   <p className="mb-6 text-slate-700 leading-relaxed text-lg">{ayah.translation}</p>
+                                   
+                                   <div className="flex items-center gap-2 mb-2">
+                                     <div className="w-1 h-4 bg-amber-500 rounded-full"></div>
+                                     <p className="font-bold text-slate-900 text-xs uppercase tracking-wider">Tafsir (Al-Muyassar)</p>
+                                   </div>
+                                   <p className="text-right font-serif text-slate-600 leading-relaxed text-lg" dir="rtl">{ayah.tafsir}</p>
                                 </div>
                              </div>
-                             <div className="shrink-0 pt-2">
-                                <span className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center text-sm font-bold shadow-sm">
+                             
+                             <div className="shrink-0 pt-3">
+                                <span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold shadow-sm border border-amber-100/50">
                                   {ayah.numberInSurah}
                                 </span>
                              </div>
@@ -137,16 +147,16 @@ const MushafScreen = () => {
                       <>
                         <span 
                           onClick={() => toggleAudio(ayah)}
-                          className={`font-quran cursor-pointer transition-colors duration-200 px-1 rounded decoration-emerald-200 decoration-2 select-text ${
-                            playingAyah === ayah.number ? 'bg-emerald-100 text-emerald-900' : 'text-gray-800 hover:text-emerald-800'
+                          className={`font-quran cursor-pointer transition-all duration-300 px-1 rounded-lg decoration-teal-200/50 decoration-2 select-text ${
+                            playingAyah === ayah.number ? 'bg-teal-50 text-teal-800' : 'text-slate-800 hover:text-teal-700'
                           }`}
                           style={{ fontSize: `${fontSize}px` }}
                         >
                           {ayah.text}
                         </span>
                         {/* Ayah End Marker */}
-                        <span className="inline-flex items-center justify-center min-w-[30px] h-[30px] mx-1 bg-amber-50 rounded-full text-sm text-amber-800 border border-amber-300 font-bold select-none align-middle mt-1 shadow-sm font-sans"
-                          style={{ transform: 'translateY(5px)' }}
+                        <span className="inline-flex items-center justify-center min-w-[34px] h-[34px] mx-2 bg-[#FDFCF8] rounded-full text-xs text-amber-600 border border-amber-200 font-bold select-none align-middle mt-1 shadow-sm font-sans"
+                          style={{ transform: 'translateY(8px)' }}
                         >
                           {ayah.numberInSurah}
                         </span>
@@ -156,7 +166,7 @@ const MushafScreen = () => {
                ))}
             </div>
 
-            <div className="mt-12 pt-8 border-t border-gray-100 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+            <div className="mt-16 pt-10 border-t border-slate-100 text-center text-slate-400 text-sm flex items-center justify-center gap-2 uppercase tracking-widest font-bold">
               <BookOpen size={16} />
               <span>Sadaqallah Al-Adheem</span>
             </div>
@@ -177,46 +187,47 @@ const SurahList = ({ surahs, loading, onSelect }: { surahs: Surah[], loading: bo
   );
 
   return (
-    <div className="flex flex-col h-full bg-white md:bg-gray-50">
-      <div className="p-6 bg-white border-b border-gray-100 sticky top-0 z-20 shadow-sm md:shadow-none">
-        <h1 className="text-3xl font-bold mb-4 text-emerald-900 font-serif">Noble Quran</h1>
-        <div className="relative max-w-lg">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+    <div className="flex flex-col h-full bg-[#FDFCF8]">
+      <div className="px-6 py-8 bg-[#FDFCF8] sticky top-0 z-20">
+        <h1 className="text-4xl font-extrabold mb-6 text-slate-900 tracking-tight">The Noble Quran</h1>
+        <div className="relative max-w-xl">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input 
             type="text" 
-            placeholder="Search by surah name or number..." 
-            className="w-full bg-gray-50 md:bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm"
+            placeholder="Search surah..." 
+            className="w-full bg-white border border-slate-200 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all shadow-sm font-medium"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-0 md:p-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-24">
         {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-               <Loader2 size={32} className="animate-spin mb-2" />
-               <p>Loading Surahs...</p>
+            <div className="flex flex-col items-center justify-center py-32 text-slate-400">
+               <Loader2 size={40} className="animate-spin mb-4 text-teal-500" />
+               <p className="font-bold tracking-widest text-sm">LOADING...</p>
             </div>
         ) : (
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-4">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.map((surah) => (
                 <button 
                     key={surah.number} 
                     onClick={() => onSelect(surah)}
-                    className="w-full p-4 flex items-center justify-between bg-white hover:bg-emerald-50 md:rounded-xl md:border md:border-gray-100 md:shadow-sm md:hover:shadow-md transition-all group text-left border-b border-gray-50 md:border-b-gray-100 last:border-0"
+                    className="group relative w-full p-5 flex items-center justify-between bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-teal-100 hover:-translate-y-1 transition-all duration-300 text-left"
                 >
-                    <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-50 group-hover:bg-emerald-100 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-700 font-bold text-lg rotate-45 transition-colors shadow-inner">
-                        <span className="-rotate-45">{surah.number}</span>
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-gray-800 group-hover:text-emerald-900">{surah.englishName}</h3>
-                        <p className="text-xs text-gray-500">{surah.englishNameTranslation} • {surah.numberOfAyahs} Ayahs</p>
-                    </div>
+                    <div className="flex items-center gap-5">
+                        <div className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 font-bold flex items-center justify-center text-sm group-hover:bg-teal-500 group-hover:text-white transition-colors">
+                            {surah.number}
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-slate-900 text-lg group-hover:text-teal-700 transition-colors">{surah.englishName}</h3>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{surah.englishNameTranslation}</p>
+                        </div>
                     </div>
                     <div className="text-right">
-                        <span className="font-quran text-2xl text-emerald-800/80 group-hover:text-emerald-900">{surah.name}</span>
+                        <span className="font-quran text-2xl text-slate-800 opacity-60 group-hover:opacity-100 transition-opacity">{surah.name}</span>
+                        <p className="text-[10px] text-slate-400 font-bold mt-1">{surah.numberOfAyahs} Ayahs</p>
                     </div>
                 </button>
                 ))}

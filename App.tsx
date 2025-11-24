@@ -1,10 +1,11 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import ResponsiveLayout from './components/Layout/MobileFrame'; // Using the refactored layout
+import ResponsiveLayout from './components/Layout/MobileFrame';
 import BottomNav from './components/Layout/BottomNav';
 import AuthScreen from './pages/AuthScreen';
 import HomeScreen from './pages/HomeScreen';
+import LandingScreen from './pages/LandingScreen';
 import MushafScreen from './pages/MushafScreen';
 import MemorizationScreen from './pages/MemorizationScreen';
 import TeachersScreen from './pages/TeachersScreen';
@@ -39,9 +40,12 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/auth" element={!user ? <AuthScreen /> : <Navigate to="/" />} />
+      {/* Public Routes */}
+      <Route path="/" element={!user ? <LandingScreen /> : <Navigate to="/dashboard" />} />
+      <Route path="/auth" element={!user ? <AuthScreen /> : <Navigate to="/dashboard" />} />
       
-      <Route path="/" element={<ProtectedRoute><HomeScreen /></ProtectedRoute>} />
+      {/* Protected Routes */}
+      <Route path="/dashboard" element={<ProtectedRoute><HomeScreen /></ProtectedRoute>} />
       <Route path="/mushaf" element={<ProtectedRoute><MushafScreen /></ProtectedRoute>} />
       <Route path="/memorize" element={<ProtectedRoute><MemorizationScreen /></ProtectedRoute>} />
       <Route path="/teachers" element={<ProtectedRoute><TeachersScreen /></ProtectedRoute>} />

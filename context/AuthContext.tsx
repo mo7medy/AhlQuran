@@ -4,7 +4,7 @@ import { User } from '../types';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (role: 'student' | 'teacher') => void;
+  login: (role: 'student' | 'teacher', formData?: any) => void;
   logout: () => void;
 }
 
@@ -23,15 +23,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(false);
   }, []);
 
-  const login = (role: 'student' | 'teacher') => {
+  const login = (role: 'student' | 'teacher', formData?: any) => {
+    // If formData is provided (from signup), use it. Otherwise use default mock data.
     const mockUser: User = {
-      uid: 'user_12345',
-      email: role === 'student' ? 'student@demo.com' : 'teacher@demo.com',
-      displayName: role === 'student' ? 'Abdullah Student' : 'Sheikh Abdullah',
+      uid: 'user_' + Date.now(),
+      email: formData?.email || (role === 'student' ? 'student@demo.com' : 'teacher@demo.com'),
+      displayName: formData?.name || (role === 'student' ? 'Abdullah Student' : 'Sheikh Abdullah'),
       role: role,
-      memorizedAyahs: 145,
-      avatarUrl: `https://picsum.photos/100/100?random=${role === 'student' ? 8 : 9}`
+      memorizedAyahs: role === 'student' ? 0 : 6236, // New students start at 0
+      avatarUrl: `https://ui-avatars.com/api/?name=${formData?.name || (role==='student' ? 'Abdullah' : 'Sheikh')}&background=${role === 'student' ? '0D9488' : '0F172A'}&color=fff`
     };
+    
+    // In a real app, if it's a teacher, we would save the bio, subjects, rate to a backend here.
+    
     setUser(mockUser);
     localStorage.setItem('quran_app_user', JSON.stringify(mockUser));
   };

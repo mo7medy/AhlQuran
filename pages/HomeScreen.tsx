@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { BookOpen, Calendar, ChevronRight, PlayCircle } from 'lucide-react';
+import { BookOpen, Calendar, ChevronRight, PlayCircle, TrendingUp, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const HomeScreen = () => {
@@ -8,103 +8,120 @@ const HomeScreen = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="flex-1 bg-gray-50 overflow-y-auto no-scrollbar pb-24">
+    <div className="flex-1 bg-[#FDFCF8] overflow-y-auto no-scrollbar pb-32">
       {/* Header Section */}
-      <div className="bg-emerald-800 text-white p-6 rounded-b-[2rem] shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div className="relative z-10">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <p className="text-emerald-200 text-sm">Assalamu Alaikum,</p>
-              <h2 className="text-2xl font-bold">{user?.displayName?.split(' ')[0]}</h2>
-            </div>
-            {user?.avatarUrl && (
-              <img src={user.avatarUrl} alt="Profile" className="w-12 h-12 rounded-full border-2 border-emerald-400" />
-            )}
+      <header className="px-6 pt-8 pb-6 md:px-10 md:pt-12">
+        <div className="flex justify-between items-end">
+          <div>
+            <p className="text-slate-500 font-medium mb-1">Assalamu Alaikum,</p>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+              {user?.displayName?.split(' ')[0]}
+            </h1>
           </div>
-
-          {/* Daily Card */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4 mb-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-amber-400 text-xs font-bold uppercase tracking-wider">Ayah of the Day</span>
-              <span className="text-emerald-200 text-xs">Al-Baqarah 2:286</span>
-            </div>
-            <p className="font-quran text-right text-xl mb-3 leading-loose">
-              لَا يُكَلِّفُ ٱللَّهُ نَفْسًا إِلَّا وُسْعَهَا
-            </p>
-            <p className="text-sm text-emerald-100 opacity-90">
-              "Allah does not burden a soul beyond that it can bear..."
-            </p>
+          <div className="hidden md:block">
+             <span className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-100 rounded-full shadow-sm text-sm font-bold text-slate-600">
+               <Award className="text-amber-500" size={18} /> Premium Plan
+             </span>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="p-5 space-y-6">
+      {/* Main Content Grid */}
+      <div className="px-6 md:px-10 space-y-6 md:space-y-0 md:grid md:grid-cols-12 md:gap-6">
         
-        {/* Progress Section */}
-        <section>
-          <div className="flex justify-between items-end mb-3">
-            <h3 className="font-bold text-gray-800 text-lg">Your Progress</h3>
-            <span className="text-emerald-600 text-sm font-medium">View All</span>
-          </div>
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <path className="text-gray-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                <path className="text-emerald-500" strokeDasharray="60, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-              </svg>
-              <span className="absolute text-sm font-bold text-gray-700">60%</span>
-            </div>
-            <div className="flex-1">
-              <h4 className="font-semibold text-gray-800">Juz 1 Revision</h4>
-              <p className="text-xs text-gray-500 mb-2">Last active: 2 hours ago</p>
-              <button onClick={() => navigate('/mushaf')} className="bg-emerald-50 text-emerald-700 text-xs py-1.5 px-3 rounded-full font-medium hover:bg-emerald-100 transition-colors">
-                Continue
-              </button>
-            </div>
-          </div>
-        </section>
+        {/* Featured Card (Ayah) */}
+        <div className="md:col-span-8 relative group overflow-hidden rounded-[2.5rem] bg-slate-900 text-white shadow-2xl shadow-slate-900/20">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500 rounded-full blur-[80px] opacity-20 translate-x-1/2 -translate-y-1/2 group-hover:opacity-30 transition-opacity duration-700"></div>
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500 rounded-full blur-[80px] opacity-10 -translate-x-1/2 translate-y-1/2"></div>
+            
+            <div className="relative p-8 md:p-10 z-10">
+                <div className="flex items-center justify-between mb-6">
+                    <span className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-bold text-teal-300 uppercase tracking-wider border border-white/5">
+                        Daily Inspiration
+                    </span>
+                    <span className="text-slate-400 text-sm font-medium">Al-Baqarah 2:286</span>
+                </div>
+                
+                <p className="font-quran text-right text-2xl md:text-4xl mb-6 leading-loose md:leading-[2.2] text-white">
+                    لَا يُكَلِّفُ ٱللَّهُ نَفْسًا إِلَّا وُسْعَهَا
+                </p>
+                
+                <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-xl">
+                    "Allah does not burden a soul beyond that it can bear..."
+                </p>
 
-        {/* Quick Actions */}
-        <section className="grid grid-cols-2 gap-4">
-          <button onClick={() => navigate('/mushaf')} className="bg-emerald-50 p-4 rounded-2xl flex flex-col items-start gap-3 hover:bg-emerald-100 transition-colors">
-            <div className="bg-emerald-100 p-2 rounded-full">
-              <BookOpen className="text-emerald-600" size={20} />
+                <div className="mt-8 flex gap-3">
+                    <button onClick={() => navigate('/mushaf')} className="bg-white text-slate-900 px-6 py-3 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors">
+                        Read Surah
+                    </button>
+                    <button className="px-6 py-3 rounded-xl font-bold text-sm text-white border border-white/20 hover:bg-white/10 transition-colors">
+                        Share
+                    </button>
+                </div>
             </div>
-            <span className="font-semibold text-gray-800">Read Quran</span>
-          </button>
-          <button onClick={() => navigate('/courses')} className="bg-amber-50 p-4 rounded-2xl flex flex-col items-start gap-3 hover:bg-amber-100 transition-colors">
-            <div className="bg-amber-100 p-2 rounded-full">
-              <PlayCircle className="text-amber-600" size={20} />
+        </div>
+
+        {/* Progress Card */}
+        <div className="md:col-span-4 bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between group hover:border-teal-100 transition-colors">
+            <div>
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-teal-50 rounded-2xl text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-colors duration-300">
+                        <TrendingUp size={24} />
+                    </div>
+                    <span className="text-2xl font-bold text-slate-900">60%</span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-1">Juz 1 Hifz</h3>
+                <p className="text-sm text-slate-400">Keep going, you're doing great.</p>
             </div>
-            <span className="font-semibold text-gray-800">Islamic Courses</span>
-          </button>
-        </section>
+            
+            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-6">
+                <div className="bg-teal-500 h-full w-[60%] rounded-full"></div>
+            </div>
+            
+            <button onClick={() => navigate('/memorize')} className="mt-6 w-full py-3 rounded-xl bg-slate-50 text-slate-600 font-bold text-sm hover:bg-slate-900 hover:text-white transition-all">
+                Continue Revision
+            </button>
+        </div>
+
+        {/* Quick Actions Row */}
+        <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+                { label: 'Read Quran', icon: BookOpen, color: 'bg-indigo-50 text-indigo-600', route: '/mushaf' },
+                { label: 'Find Teacher', icon: Calendar, color: 'bg-emerald-50 text-emerald-600', route: '/teachers' },
+                { label: 'Courses', icon: PlayCircle, color: 'bg-amber-50 text-amber-600', route: '/courses' },
+                { label: 'Memorize', icon: Award, color: 'bg-rose-50 text-rose-600', route: '/memorize' },
+            ].map((action, idx) => (
+                <button 
+                    key={idx}
+                    onClick={() => navigate(action.route)}
+                    className="bg-white p-6 rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/40 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 flex flex-col items-center justify-center gap-3 group"
+                >
+                    <div className={`p-4 rounded-full ${action.color} group-hover:scale-110 transition-transform`}>
+                        <action.icon size={24} />
+                    </div>
+                    <span className="font-bold text-slate-700 text-sm">{action.label}</span>
+                </button>
+            ))}
+        </div>
 
         {/* Upcoming Session */}
-        <section>
-          <h3 className="font-bold text-gray-800 text-lg mb-3">Upcoming Session</h3>
-          <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-            <div className="flex items-start gap-4">
-              <div className="bg-indigo-100 text-indigo-600 rounded-xl p-3 flex flex-col items-center min-w-[3.5rem]">
-                <span className="text-xs font-bold uppercase">Oct</span>
-                <span className="text-lg font-bold">12</span>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-indigo-900">Tajweed Correction</h4>
-                <p className="text-sm text-indigo-600 mb-2">with Sheikh Ahmed</p>
-                <div className="flex items-center gap-2 text-xs text-indigo-400">
-                  <Calendar size={12} />
-                  <span>10:00 AM - 11:00 AM</span>
+        <div className="md:col-span-12">
+          <div className="bg-white rounded-[2rem] p-2 pr-6 border border-slate-100 shadow-xl shadow-slate-200/50 flex items-center justify-between">
+             <div className="flex items-center gap-6">
+                <div className="bg-slate-900 text-white p-6 rounded-[1.5rem] text-center min-w-[5rem]">
+                    <span className="block text-xs font-bold uppercase opacity-60">Oct</span>
+                    <span className="block text-2xl font-bold">12</span>
                 </div>
-              </div>
-              <button className="bg-indigo-600 text-white p-2 rounded-full shadow-md shadow-indigo-200">
-                 <ChevronRight size={16} />
-              </button>
-            </div>
+                <div>
+                    <h4 className="font-bold text-lg text-slate-900">Tajweed Correction</h4>
+                    <p className="text-slate-500 text-sm">with Sheikh Ahmed • 10:00 AM</p>
+                </div>
+             </div>
+             <button className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-teal-600 hover:text-white transition-all">
+                 <ChevronRight size={20} />
+             </button>
           </div>
-        </section>
+        </div>
 
       </div>
     </div>
