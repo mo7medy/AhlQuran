@@ -1,0 +1,7 @@
+{
+  "name": "QuranMemo - Memorization & Studies",
+  "description": "A comprehensive Islamic studies and Quran memorization platform connecting students with teachers.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
