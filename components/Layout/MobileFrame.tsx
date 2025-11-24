@@ -1,12 +1,14 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, BookOpen, GraduationCap, Users, User, LogOut, Moon, Settings, Bell, Globe, Sparkles } from 'lucide-react';
+import { Home, BookOpen, GraduationCap, Users, User, LogOut, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const ResponsiveLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { t, isRTL } = useLanguage();
   
   const isLanding = location.pathname === '/';
 
@@ -14,7 +16,6 @@ const ResponsiveLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   if (!user || isLanding) {
       return (
           <div className="flex h-[100dvh] w-full bg-[#FDFCF8] text-slate-900">
-             {/* Changed overflow-hidden to overflow-y-auto to allow landing page scrolling */}
              <main className="flex-1 flex flex-col h-full w-full bg-[#FDFCF8] overflow-y-auto relative">
                 {children}
              </main>
@@ -45,7 +46,7 @@ const ResponsiveLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   return (
     <div className="flex h-[100dvh] w-full bg-[#FDFCF8] overflow-hidden text-slate-900">
       
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Updated for RTL (switch left/right margins to start/end) */}
       <aside className="hidden md:flex flex-col w-[280px] bg-slate-950 text-white h-full shrink-0 relative z-20">
         {/* Header */}
         <div className="p-8 pb-4 flex items-center gap-3">
@@ -65,9 +66,9 @@ const ResponsiveLayout: React.FC<{ children: React.ReactNode }> = ({ children })
                     alt="User" 
                     className="w-10 h-10 rounded-full border-2 border-slate-700 object-cover"
                 />
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-teal-500 border-2 border-slate-900 rounded-full"></div>
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-teal-500 border-2 border-slate-900 rounded-full rtl:left-0 rtl:right-auto"></div>
             </div>
-           <div className="overflow-hidden">
+           <div className="overflow-hidden text-start">
              <h3 className="font-bold text-sm truncate text-slate-200">{user?.displayName?.split(' ')[0]}</h3>
              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{user?.role}</p>
            </div>
@@ -75,17 +76,17 @@ const ResponsiveLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
         {/* Navigation */}
         <nav className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar">
-          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-2">Menu</p>
-          <NavItem path="/dashboard" icon={Home} label="Dashboard" />
-          <NavItem path="/mushaf" icon={BookOpen} label="Read Quran" />
-          <NavItem path="/memorize" icon={GraduationCap} label="Memorization" />
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-2">{t('nav.menu')}</p>
+          <NavItem path="/dashboard" icon={Home} label={t('nav.dashboard')} />
+          <NavItem path="/mushaf" icon={BookOpen} label={t('nav.quran')} />
+          <NavItem path="/memorize" icon={GraduationCap} label={t('nav.memorize')} />
           
-          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-6">Community</p>
-          <NavItem path="/teachers" icon={Users} label="Find Teachers" />
-          <NavItem path="/courses" icon={BookOpen} label="Courses" />
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-6">{t('nav.community')}</p>
+          <NavItem path="/teachers" icon={Users} label={t('nav.teachers')} />
+          <NavItem path="/courses" icon={Sparkles} label={t('nav.courses')} />
           
-          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-6">Account</p>
-          <NavItem path="/profile" icon={User} label="My Profile" />
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-6">{t('nav.account')}</p>
+          <NavItem path="/profile" icon={User} label={t('nav.profile')} />
         </nav>
 
         {/* Footer actions */}
@@ -94,14 +95,14 @@ const ResponsiveLayout: React.FC<{ children: React.ReactNode }> = ({ children })
             onClick={logout} 
             className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-2xl transition-all text-sm font-medium"
           >
-             <LogOut size={18} />
-             <span>Sign Out</span>
+             <LogOut size={18} className={isRTL ? "rotate-180" : ""} />
+             <span>{t('nav.signout')}</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative w-full bg-[#FDFCF8] md:bg-white md:rounded-l-[40px] md:shadow-2xl md:my-0 md:mr-0 z-10">
+      <main className={`flex-1 flex flex-col h-full overflow-hidden relative w-full bg-[#FDFCF8] md:bg-white md:shadow-2xl md:my-0 z-10 ${isRTL ? 'md:rounded-r-[40px] md:mr-0' : 'md:rounded-l-[40px] md:ml-0'}`}>
          <div className="flex-1 flex flex-col w-full h-full relative overflow-hidden">
             {children}
          </div>

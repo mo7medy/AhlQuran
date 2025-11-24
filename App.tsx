@@ -1,6 +1,8 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ResponsiveLayout from './components/Layout/MobileFrame';
 import BottomNav from './components/Layout/BottomNav';
 import AuthScreen from './pages/AuthScreen';
@@ -12,6 +14,7 @@ import TeachersScreen from './pages/TeachersScreen';
 import TeacherProfileScreen from './pages/TeacherProfileScreen';
 import ProfileScreen from './pages/ProfileScreen';
 import CoursesScreen from './pages/CoursesScreen';
+import NotificationsScreen from './pages/NotificationsScreen';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -52,6 +55,7 @@ const AppRoutes = () => {
       <Route path="/teachers/:teacherId" element={<ProtectedRoute><TeacherProfileScreen /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
       <Route path="/courses" element={<ProtectedRoute><CoursesScreen /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><NotificationsScreen /></ProtectedRoute>} />
       
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
@@ -60,13 +64,17 @@ const AppRoutes = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <HashRouter>
-        <ResponsiveLayout>
-          <AppRoutes />
-        </ResponsiveLayout>
-      </HashRouter>
-    </AuthProvider>
+    <LanguageProvider>
+      <NotificationProvider>
+        <AuthProvider>
+          <HashRouter>
+            <ResponsiveLayout>
+              <AppRoutes />
+            </ResponsiveLayout>
+          </HashRouter>
+        </AuthProvider>
+      </NotificationProvider>
+    </LanguageProvider>
   );
 };
 

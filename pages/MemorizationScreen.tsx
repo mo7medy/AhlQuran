@@ -1,130 +1,367 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchSurahList, fetchSurahDetails } from '../services/quranApi';
 import { Surah, Ayah } from '../types';
-import { Eye, EyeOff, CheckCircle, RefreshCcw, ChevronDown, ChevronRight, Book, Loader2 } from 'lucide-react';
+import { 
+  Eye, EyeOff, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, 
+  Settings, CheckCircle, AlertTriangle, XCircle, BarChart3, BookOpen, 
+  Volume2, ArrowRight, Award, Repeat
+} from 'lucide-react';
+
+type SessionState = 'setup' | 'active' | 'summary';
+
+interface SessionStats {
+  perfect: number;
+  good: number;
+  forgot: number;
+}
 
 const MemorizationScreen = () => {
+  // Data State
   const [surahs, setSurahs] = useState<Surah[]>([]);
-  const [selectedSurahId, setSelectedSurahId] = useState<number>(1); // Default Al-Fatiha
-  const [ayahs, setAyahs] = useState<Ayah[]>([]);
   const [loading, setLoading] = useState(false);
   
-  const [isHidden, setIsHidden] = useState(false);
-  const [completedCount, setCompletedCount] = useState(0);
+  // Setup State
+  const [selectedSurah, setSelectedSurah] = useState<Surah | null>(null);
+  const [ayahs, setAyahs] = useState<Ayah[]>([]);
+  const [rangeStart, setRangeStart] = useState(1);
+  const [rangeEnd, setRangeEnd] = useState(10);
+  const [sessionState, setSessionState] = useState<SessionState>('setup');
 
-  // Load Surah List
+  // Session State
+  const [sessionAyahs, setSessionAyahs] = useState<Ayah[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTextHidden, setIsTextHidden] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [stats, setStats] = useState<SessionStats>({ perfect: 0, good: 0, forgot: 0 });
+  
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initial Load
   useEffect(() => {
-    fetchSurahList().then(setSurahs);
+    const loadData = async () => {
+        setLoading(true);
+        const data = await fetchSurahList();
+        setSurahs(data);
+        if (data.length > 0) {
+            setSelectedSurah(data[0]); // Default Al-Fatiha
+        }
+        setLoading(false);
+    };
+    loadData();
   }, []);
 
-  // Load Ayahs when selection changes
+  // Fetch Ayahs when Surah changes
   useEffect(() => {
-    const loadAyahs = async () => {
-      setLoading(true);
-      const data = await fetchSurahDetails(selectedSurahId);
-      setAyahs(data);
-      setCompletedCount(0);
-      setLoading(false);
-    };
-    loadAyahs();
-  }, [selectedSurahId]);
+    if (selectedSurah) {
+        const loadAyahs = async () => {
+            setLoading(true);
+            const data = await fetchSurahDetails(selectedSurah.number);
+            setAyahs(data);
+            setRangeStart(1);
+            setRangeEnd(data.length);
+            setLoading(false);
+        };
+        loadAyahs();
+    }
+  }, [selectedSurah]);
 
-  const progressPercentage = ayahs.length > 0 ? Math.round((completedCount / ayahs.length) * 100) : 0;
+  // Audio Handler
+  useEffect(() => {
+    return () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+    };
+  }, []);
+
+  const handleStartSession = () => {
+    const filtered = ayahs.filter(a => a.numberInSurah >= rangeStart && a.numberInSurah <= rangeEnd);
+    setSessionAyahs(filtered);
+    setCurrentIndex(0);
+    setStats({ perfect: 0, good: 0, forgot: 0 });
+    setIsTextHidden(true);
+    setSessionState('active');
+  };
+
+  const handleGrade = (grade: 'perfect' | 'good' | 'forgot') => {
+    setStats(prev => ({ ...prev, [grade]: prev[grade] + 1 }));
+    
+    if (currentIndex < sessionAyahs.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+        setIsTextHidden(true); // Auto hide next card
+        if (audioRef.current) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        }
+    } else {
+        setSessionState('summary');
+    }
+  };
+
+  const toggleAudio = () => {
+    if (!sessionAyahs[currentIndex]?.audio) return;
+
+    if (isPlaying) {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+    } else {
+        audioRef.current = new Audio(sessionAyahs[currentIndex].audio);
+        audioRef.current.play();
+        setIsPlaying(true);
+        audioRef.current.onended = () => setIsPlaying(false);
+    }
+  };
+
+  const restartSession = () => {
+      setCurrentIndex(0);
+      setStats({ perfect: 0, good: 0, forgot: 0 });
+      setIsTextHidden(true);
+      setSessionState('active');
+  };
+
+  if (loading && !selectedSurah) {
+      return (
+          <div className="flex items-center justify-center h-full bg-[#FDFCF8]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+          </div>
+      );
+  }
 
   return (
-    <div className="flex-1 bg-gray-50 overflow-y-auto pb-24 h-full">
-      <div className="bg-emerald-800 p-6 rounded-b-3xl shadow-md sticky top-0 z-20">
-        <h1 className="text-2xl font-bold text-white mb-4">Hifz Test</h1>
-        
-        {/* Selector */}
-        <div className="relative mb-6">
-            <select 
-                value={selectedSurahId}
-                onChange={(e) => setSelectedSurahId(Number(e.target.value))}
-                className="w-full appearance-none bg-emerald-900/50 text-white border border-emerald-600/50 rounded-xl py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-400 font-medium"
-            >
-                {surahs.map(s => (
-                    <option key={s.number} value={s.number} className="text-gray-900">
-                        {s.number}. {s.englishName} - {s.name}
-                    </option>
-                ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-200 pointer-events-none" size={20} />
-        </div>
-        
-        <div className="flex justify-between items-center bg-emerald-900/50 p-4 rounded-xl backdrop-blur-sm">
-            <div className="text-center">
-                <span className="block text-2xl font-bold text-white">{completedCount}</span>
-                <span className="text-xs text-emerald-300">Recited</span>
-            </div>
-            <div className="h-8 w-[1px] bg-emerald-700"></div>
-            <div className="text-center">
-                <span className="block text-2xl font-bold text-amber-400">{progressPercentage}%</span>
-                <span className="text-xs text-emerald-300">Complete</span>
-            </div>
-            <button 
-                onClick={() => setIsHidden(!isHidden)}
-                className="bg-emerald-500 hover:bg-emerald-400 text-white p-3 rounded-full transition-colors shadow-lg shadow-emerald-900/20"
-                title={isHidden ? "Show Text" : "Hide Text"}
-            >
-                {isHidden ? <Eye size={20} /> : <EyeOff size={20} />}
-            </button>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4 max-w-3xl mx-auto">
-        {loading ? (
-             <div className="flex flex-col items-center justify-center py-20 text-emerald-600">
-                <Loader2 size={32} className="animate-spin mb-2" />
-                <p>Loading Surah...</p>
+    <div className="flex-1 bg-[#FDFCF8] flex flex-col h-full overflow-hidden relative">
+      
+      {/* HEADER */}
+      <header className="px-6 py-4 bg-white border-b border-slate-100 flex items-center justify-between z-20">
+         <div className="flex items-center gap-3">
+             {sessionState !== 'setup' && (
+                 <button onClick={() => setSessionState('setup')} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-500">
+                     <ChevronLeft size={24} />
+                 </button>
+             )}
+             <h1 className="text-xl font-bold text-slate-900">
+                 {sessionState === 'setup' ? 'Memorization Setup' : selectedSurah?.englishName}
+             </h1>
+         </div>
+         {sessionState === 'active' && (
+             <div className="text-sm font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full">
+                 {currentIndex + 1} / {sessionAyahs.length}
              </div>
-        ) : (
-            ayahs.map((ayah) => (
-            <div key={ayah.number} className={`bg-white p-5 rounded-xl shadow-sm border transition-all duration-300 ${isHidden ? 'border-emerald-100 bg-emerald-50/30' : 'border-gray-100'}`}>
-                <div className="flex justify-between items-start mb-4">
-                    <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
-                        {ayah.numberInSurah}
-                    </span>
-                    <button 
-                        onClick={() => {}} // Placeholder for reset single ayah
-                        className="text-gray-300 hover:text-emerald-500"
+         )}
+      </header>
+
+      {/* CONTENT */}
+      <main className="flex-1 overflow-y-auto relative">
+        
+        {/* VIEW 1: SETUP */}
+        {sessionState === 'setup' && (
+            <div className="p-6 max-w-lg mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                
+                {/* Surah Selector */}
+                <div className="space-y-3">
+                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+                        <BookOpen size={16} /> Select Surah
+                    </label>
+                    <select 
+                        value={selectedSurah?.number}
+                        onChange={(e) => {
+                            const found = surahs.find(s => s.number === Number(e.target.value));
+                            if (found) setSelectedSurah(found);
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-4 text-lg font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none shadow-sm appearance-none"
                     >
-                        <RefreshCcw size={16} />
+                        {surahs.map(s => (
+                            <option key={s.number} value={s.number}>
+                                {s.number}. {s.englishName} ({s.name})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Range Selector */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40">
+                    <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <Settings size={20} className="text-teal-600" /> Target Range
+                    </h3>
+                    
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-slate-400 mb-2 block">From Ayah</label>
+                            <input 
+                                type="number" 
+                                min={1} 
+                                max={ayahs.length}
+                                value={rangeStart}
+                                onChange={(e) => setRangeStart(Math.min(Number(e.target.value), rangeEnd))}
+                                className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-center font-bold text-xl text-slate-800 focus:ring-2 focus:ring-teal-500"
+                            />
+                        </div>
+                        <div className="text-slate-300 font-bold text-xl">-</div>
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-slate-400 mb-2 block">To Ayah</label>
+                            <input 
+                                type="number" 
+                                min={rangeStart} 
+                                max={ayahs.length}
+                                value={rangeEnd}
+                                onChange={(e) => setRangeEnd(Math.max(Number(e.target.value), rangeStart))}
+                                className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-center font-bold text-xl text-slate-800 focus:ring-2 focus:ring-teal-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-teal-50 rounded-2xl p-4 flex items-center gap-4 text-teal-800">
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-teal-600 font-bold shrink-0">
+                            {rangeEnd - rangeStart + 1}
+                        </div>
+                        <div className="text-sm font-medium">
+                            Ayahs selected for this session.
+                        </div>
+                    </div>
+                </div>
+
+                <button 
+                    onClick={handleStartSession}
+                    className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-slate-900/20 hover:bg-slate-800 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                >
+                    Start Memorization <ArrowRight size={20} />
+                </button>
+            </div>
+        )}
+
+        {/* VIEW 2: ACTIVE SESSION */}
+        {sessionState === 'active' && sessionAyahs.length > 0 && (
+            <div className="flex flex-col h-full p-6 max-w-2xl mx-auto">
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-slate-100 h-2 rounded-full mb-8 overflow-hidden">
+                    <div 
+                        className="bg-teal-500 h-full transition-all duration-500 rounded-full"
+                        style={{ width: `${((currentIndex) / sessionAyahs.length) * 100}%` }}
+                    ></div>
+                </div>
+
+                {/* Card */}
+                <div className="flex-1 flex flex-col justify-center min-h-[300px]">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-50 p-8 md:p-12 relative overflow-hidden group">
+                        
+                        {/* Audio Button */}
+                        <button 
+                            onClick={toggleAudio}
+                            className={`absolute top-6 left-6 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${isPlaying ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30 scale-110' : 'bg-slate-50 text-slate-400 hover:bg-teal-50 hover:text-teal-600'}`}
+                        >
+                            {isPlaying ? <Pause size={20} fill="currentColor" /> : <Volume2 size={20} />}
+                        </button>
+
+                        {/* Text Visibility Toggle */}
+                        <button 
+                            onClick={() => setIsTextHidden(!isTextHidden)}
+                            className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors"
+                        >
+                            {isTextHidden ? <Eye size={20} /> : <EyeOff size={20} />}
+                        </button>
+
+                        {/* Arabic Text */}
+                        <div 
+                            className={`text-center transition-all duration-500 my-10 ${isTextHidden ? 'blur-md opacity-20 select-none' : 'opacity-100 blur-0'}`}
+                            onClick={() => isTextHidden && setIsTextHidden(false)}
+                        >
+                            <p className="font-quran text-4xl md:text-5xl leading-[2.5] text-slate-800" dir="rtl">
+                                {sessionAyahs[currentIndex].text}
+                            </p>
+                        </div>
+
+                        {/* Hint Text when hidden */}
+                        {isTextHidden && (
+                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <span className="bg-slate-900/5 backdrop-blur-sm text-slate-500 px-4 py-2 rounded-full text-sm font-bold border border-white/20">
+                                    Tap to reveal
+                                </span>
+                             </div>
+                        )}
+                        
+                        <div className="text-center mt-6">
+                            <span className="inline-block px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-100">
+                                Ayah {sessionAyahs[currentIndex].numberInSurah}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="mt-8 grid grid-cols-3 gap-4">
+                    <button 
+                        onClick={() => handleGrade('forgot')}
+                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors active:scale-95"
+                    >
+                        <XCircle size={24} />
+                        <span className="text-xs font-bold uppercase tracking-wide">Forgot</span>
+                    </button>
+
+                    <button 
+                        onClick={() => handleGrade('good')}
+                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 transition-colors active:scale-95"
+                    >
+                        <AlertTriangle size={24} />
+                        <span className="text-xs font-bold uppercase tracking-wide">Hard</span>
+                    </button>
+
+                    <button 
+                        onClick={() => handleGrade('perfect')}
+                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 hover:bg-teal-100 transition-colors active:scale-95"
+                    >
+                        <CheckCircle size={24} />
+                        <span className="text-xs font-bold uppercase tracking-wide">Perfect</span>
                     </button>
                 </div>
+            </div>
+        )}
+
+        {/* VIEW 3: SUMMARY */}
+        {sessionState === 'summary' && (
+            <div className="flex flex-col items-center justify-center h-full p-6 animate-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-teal-500/20">
+                    <Award size={40} />
+                </div>
                 
-                <p 
-                className={`font-quran text-3xl text-right leading-[2.5] transition-all duration-500 select-none ${
-                    isHidden ? 'blur-md opacity-20 hover:blur-sm hover:opacity-60 cursor-help' : 'text-gray-800'
-                }`}
-                style={{ direction: 'rtl' }}
-                >
-                {ayah.text}
+                <h2 className="text-3xl font-extrabold text-slate-900 mb-2">Session Complete!</h2>
+                <p className="text-slate-500 mb-10 text-center max-w-xs">
+                    You reviewed <span className="font-bold text-slate-800">{sessionAyahs.length} Ayahs</span> from {selectedSurah?.englishName}.
                 </p>
 
-                {isHidden && (
-                    <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-emerald-100/50">
-                        <button className="text-xs bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition-colors">
-                            Missed
-                        </button>
-                        <button 
-                            onClick={() => setCompletedCount(p => Math.min(p + 1, ayahs.length))}
-                            className="text-xs bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-200 transition-colors"
-                        >
-                            <CheckCircle size={14} /> Correct
-                        </button>
+                <div className="grid grid-cols-3 gap-4 w-full max-w-sm mb-10">
+                    <div className="bg-teal-50 p-4 rounded-2xl text-center border border-teal-100">
+                        <span className="block text-2xl font-bold text-teal-700">{stats.perfect}</span>
+                        <span className="text-[10px] font-bold text-teal-400 uppercase tracking-wider">Perfect</span>
                     </div>
-                )}
+                    <div className="bg-amber-50 p-4 rounded-2xl text-center border border-amber-100">
+                        <span className="block text-2xl font-bold text-amber-600">{stats.good}</span>
+                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Good</span>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-2xl text-center border border-red-100">
+                        <span className="block text-2xl font-bold text-red-600">{stats.forgot}</span>
+                        <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Missed</span>
+                    </div>
+                </div>
+
+                <div className="flex flex-col w-full max-w-xs gap-3">
+                    <button 
+                        onClick={restartSession}
+                        className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-900/20 hover:bg-slate-800 flex items-center justify-center gap-2"
+                    >
+                        <RotateCcw size={18} /> Restart Session
+                    </button>
+                    <button 
+                        onClick={() => setSessionState('setup')}
+                        className="w-full bg-white text-slate-600 py-4 rounded-xl font-bold border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
+                    >
+                        <Settings size={18} /> New Configuration
+                    </button>
+                </div>
             </div>
-            ))
         )}
-        
-        {!loading && ayahs.length > 0 && (
-             <div className="text-center py-8 text-gray-400 text-sm">
-                End of Surah
-             </div>
-        )}
-      </div>
+
+      </main>
     </div>
   );
 };

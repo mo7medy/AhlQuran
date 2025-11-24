@@ -62,3 +62,12 @@ export interface ChatMessage {
   timestamp: Date;
   isMe: boolean;
 }
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: Date;
+  isRead: boolean;
+  type: 'info' | 'success' | 'warning' | 'reminder';
+}
