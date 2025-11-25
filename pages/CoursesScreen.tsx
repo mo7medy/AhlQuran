@@ -3,9 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { Send, Sparkles, User, Bot, Loader2, BookOpen, AlertCircle, HelpCircle, Feather, Scroll } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-// Initialize Gemini AI
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 interface Message {
   id: string;
   role: 'user' | 'model';
@@ -52,6 +49,11 @@ const AIScreen = () => {
     setIsLoading(true);
 
     try {
+      // Lazy Initialize AI here
+      const apiKey = process.env.API_KEY || '';
+      if (!apiKey) throw new Error("API Key not found");
+      const ai = new GoogleGenAI({ apiKey });
+
       // 2. Call Gemini API
       // Construct history for context (last 10 messages max to save tokens)
       const history = messages.slice(-10).map(m => ({

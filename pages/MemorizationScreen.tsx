@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchSurahList, fetchSurahDetails } from '../services/quranApi';
 import { Surah, Ayah } from '../types';
@@ -8,9 +7,6 @@ import {
   Settings, CheckCircle, AlertTriangle, XCircle, BarChart3, BookOpen, 
   Volume2, ArrowRight, Award, Repeat, Mic, Square, Loader2, Wand2
 } from 'lucide-react';
-
-// Initialize Gemini AI
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 type SessionState = 'setup' | 'active' | 'summary';
 
@@ -215,6 +211,11 @@ const MemorizationScreen = () => {
   const analyzeRecitation = async (audioBlob: Blob) => {
     setIsAnalyzing(true);
     try {
+        // Lazy Initialize AI here
+        const apiKey = process.env.API_KEY || '';
+        if (!apiKey) throw new Error("API Key not found");
+        const ai = new GoogleGenAI({ apiKey });
+
         const base64Audio = await blobToBase64(audioBlob);
         const currentAyah = sessionAyahs[currentIndex];
 
