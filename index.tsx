@@ -1,5 +1,5 @@
 import './index.css';
-import React, { Component } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
@@ -12,8 +12,7 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fix: Use React.Component to ensure props are correctly typed
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {

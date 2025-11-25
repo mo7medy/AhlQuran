@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   LogOut, Settings, Bell, Globe, Moon, ChevronRight, User as UserIcon, 
   Camera, X, Save, Check, Mail, DollarSign, BookOpen, 
-  BarChart3, Award, Shield, Zap, TrendingUp, Calendar, Trash2
+  Award, Shield, Zap, TrendingUp, Calendar, Trash2
 } from 'lucide-react';
 import { Teacher } from '../types';
 
@@ -87,7 +87,7 @@ const ProfileScreen = () => {
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   return (
-    <div className="flex-1 bg-[#FDFCF8] flex flex-col overflow-y-auto pb-28 relative">
+    <div className="flex-1 bg-[#FDFCF8] flex flex-col overflow-y-auto pb-28 relative custom-scrollbar">
       
       {/* Success Toast */}
       {successMsg && (
@@ -98,63 +98,78 @@ const ProfileScreen = () => {
       )}
 
       {/* Header Profile Card */}
-      <div className="bg-white px-6 pt-8 pb-0 border-b border-slate-100 flex flex-col items-center relative overflow-hidden">
-        <div className="absolute top-0 w-full h-32 bg-gradient-to-r from-slate-900 to-slate-800"></div>
-        
-        <div className="relative z-10 w-28 h-28 rounded-full bg-white p-1 mb-3 shadow-xl group cursor-pointer" onClick={() => setIsEditing(true)}>
-          {user?.avatarUrl ? (
-            <img src={user.avatarUrl} alt="Profile" className="w-full h-full rounded-full object-cover border-4 border-white" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-teal-100 rounded-full text-teal-600 text-3xl font-bold border-4 border-white">
-              {user?.displayName?.[0]}
-            </div>
-          )}
-          <div className="absolute bottom-1 right-1 bg-teal-500 text-white p-1.5 rounded-full border-4 border-white shadow-lg z-20">
-             <Shield size={12} fill="currentColor" />
-          </div>
+      <div className="bg-white border-b border-slate-100 flex flex-col items-center relative">
+        {/* Cover Image with Gradient Overlay */}
+        <div className="absolute top-0 w-full h-32 md:h-40 bg-slate-900">
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1604076913837-52ab5629fba9?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
         </div>
         
-        <div className="text-center z-10 mb-6">
-            <h2 className="text-2xl font-extrabold text-slate-900 flex items-center justify-center gap-2">
-                {user?.displayName} 
-                {/* Verified Badge */}
-                <Shield size={18} className="text-teal-500 fill-teal-500/20" />
-            </h2>
-            <p className="text-sm text-slate-500 font-medium capitalize mt-1">{user?.role} Account • {user?.email}</p>
+        <div className="relative z-10 pt-16 md:pt-20 mb-4 flex flex-col items-center w-full px-6">
+            <div className="relative group cursor-pointer" onClick={() => setIsEditing(true)}>
+                <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white p-1 shadow-2xl">
+                    {user?.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-teal-50 rounded-full text-teal-600 text-3xl font-bold">
+                        {user?.displayName?.[0]}
+                        </div>
+                    )}
+                </div>
+                <div className="absolute bottom-2 right-2 bg-teal-500 text-white p-1.5 rounded-full border-4 border-white shadow-sm z-20">
+                    <Shield size={14} fill="currentColor" />
+                </div>
+            </div>
+            
+            <div className="text-center mt-3 mb-2">
+                <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 flex items-center justify-center gap-2">
+                    {user?.displayName} 
+                    {user?.role === 'teacher' && <Shield size={18} className="text-teal-500 fill-teal-500/20" />}
+                </h2>
+                <p className="text-sm font-medium text-slate-500 mt-1">{user?.email}</p>
+                <div className="flex gap-2 justify-center mt-3">
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold uppercase tracking-wider">
+                        {user?.role}
+                    </span>
+                    {user?.role === 'student' && (
+                        <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-bold uppercase tracking-wider">
+                            Level 3
+                        </span>
+                    )}
+                </div>
+            </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex w-full max-w-md mx-auto bg-slate-50 p-1 rounded-xl mb-6">
-            <button 
-                onClick={() => setActiveTab('overview')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Overview
-            </button>
-            <button 
-                onClick={() => setActiveTab('stats')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'stats' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Statistics
-            </button>
-            <button 
-                onClick={() => setActiveTab('settings')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Settings
-            </button>
+        {/* Sticky Tab Navigation */}
+        <div className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-xl border-t border-slate-100 px-4 md:px-0">
+            <div className="flex w-full max-w-md mx-auto py-2">
+                {(['overview', 'stats', 'settings'] as const).map((tab) => (
+                    <button 
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`flex-1 py-3 text-sm font-bold transition-all relative ${
+                            activeTab === tab ? 'text-teal-600' : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                    >
+                        <span className="capitalize">{tab}</span>
+                        {activeTab === tab && (
+                            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-teal-500 rounded-t-full animate-in zoom-in"></span>
+                        )}
+                    </button>
+                ))}
+            </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="p-6 max-w-lg mx-auto w-full space-y-6">
+      <div className="p-4 md:p-6 max-w-lg mx-auto w-full space-y-6 min-h-[50vh]">
         
         {/* === OVERVIEW TAB === */}
         {activeTab === 'overview' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-2">
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-teal-100 transition-colors">
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-100">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="p-2 bg-teal-50 rounded-lg text-teal-600">
                                 {user?.role === 'teacher' ? <UserIcon size={20} /> : <BookOpen size={20} />}
@@ -163,11 +178,11 @@ const ProfileScreen = () => {
                                 {user?.role === 'teacher' ? 'Students' : 'Memorized'}
                             </span>
                         </div>
-                        <span className="block text-3xl font-extrabold text-slate-900">
+                        <span className="block text-2xl md:text-3xl font-extrabold text-slate-900">
                             {user?.role === 'teacher' ? (user as Teacher).reviewsCount || 0 : user?.memorizedAyahs || 0}
                         </span>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-amber-100 transition-colors">
+                    <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-100">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
                                 {user?.role === 'teacher' ? <DollarSign size={20} /> : <Award size={20} />}
@@ -176,7 +191,7 @@ const ProfileScreen = () => {
                                 {user?.role === 'teacher' ? 'Rate/Hr' : 'Streak'}
                             </span>
                         </div>
-                        <span className="block text-3xl font-extrabold text-slate-900">
+                        <span className="block text-2xl md:text-3xl font-extrabold text-slate-900">
                             {user?.role === 'teacher' ? `$${(user as Teacher).hourlyRate}` : '12 Days'}
                         </span>
                     </div>
@@ -184,7 +199,7 @@ const ProfileScreen = () => {
 
                 {/* Bio Section */}
                 {user?.role === 'teacher' && (
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm">
                         <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
                             <UserIcon size={18} className="text-indigo-500" /> About Me
                         </h3>
@@ -202,18 +217,18 @@ const ProfileScreen = () => {
                 )}
 
                 {/* Achievements */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm">
                      <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-900 flex items-center gap-2">
                             <Award size={18} className="text-amber-500" /> Achievements
                         </h3>
                         <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">View All</span>
                      </div>
-                     <div className="space-y-4">
+                     <div className="space-y-3">
                         {achievements.map((ach, i) => (
                             <div key={i} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-2xl transition-colors cursor-pointer group">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${ach.bg} ${ach.color} group-hover:scale-110 transition-transform`}>
-                                    <ach.icon size={22} />
+                                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center ${ach.bg} ${ach.color} group-hover:scale-110 transition-transform`}>
+                                    <ach.icon size={20} />
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="font-bold text-slate-900 text-sm">{ach.label}</h4>
@@ -247,7 +262,7 @@ const ProfileScreen = () => {
                                         style={{ height: `${height}%` }}
                                     ></div>
                                 </div>
-                                <span className={`text-xs font-bold ${i === 3 ? 'text-slate-900' : 'text-slate-400'}`}>{days[i]}</span>
+                                <span className={`text-[10px] md:text-xs font-bold ${i === 3 ? 'text-slate-900' : 'text-slate-400'}`}>{days[i]}</span>
                             </div>
                         ))}
                     </div>
@@ -274,7 +289,7 @@ const ProfileScreen = () => {
 
         {/* === SETTINGS TAB === */}
         {activeTab === 'settings' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-2">
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                     <h3 className="px-5 py-4 bg-slate-50/50 text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50">Preferences</h3>
                     
@@ -318,7 +333,7 @@ const ProfileScreen = () => {
                 </div>
 
                 <div className="text-center pt-2">
-                    <p className="text-xs font-bold text-slate-300">Version 1.1.0 • Build 245</p>
+                    <p className="text-xs font-bold text-slate-300">Version 1.1.0</p>
                 </div>
             </div>
         )}
@@ -326,10 +341,16 @@ const ProfileScreen = () => {
 
       {/* EDIT PROFILE MODAL */}
       {isEditing && (
-          <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
-              <div className="bg-white w-full max-w-md rounded-[2rem] max-h-[90vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-10">
-                  <div className="sticky top-0 bg-white/80 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
-                      <h2 className="text-xl font-bold text-slate-900">Edit Profile</h2>
+          <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white w-full max-w-md rounded-t-[2.5rem] md:rounded-[2.5rem] max-h-[90vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-20 md:slide-in-from-bottom-10 pb-safe">
+                  
+                  {/* Drag Handle for Mobile */}
+                  <div className="md:hidden pt-3 pb-1 flex justify-center">
+                      <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+                  </div>
+
+                  <div className="sticky top-0 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
+                      <h2 className="text-lg md:text-xl font-bold text-slate-900">Edit Profile</h2>
                       <button onClick={() => setIsEditing(false)} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 text-slate-500">
                           <X size={20} />
                       </button>
