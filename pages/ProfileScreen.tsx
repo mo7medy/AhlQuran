@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   LogOut, Settings, Bell, Globe, Moon, ChevronRight, User as UserIcon, 
   Camera, X, Save, Check, Mail, DollarSign, BookOpen, 
-  Layout, BarChart3, Award, Shield, Zap, TrendingUp, Calendar, Trash2
+  BarChart3, Award, Shield, Zap, TrendingUp, Calendar, Trash2
 } from 'lucide-react';
 import { Teacher } from '../types';
 
@@ -37,12 +37,12 @@ const ProfileScreen = () => {
         const teacher = user as Teacher;
 
         setFormData({
-            displayName: user.displayName,
-            email: user.email,
+            displayName: user.displayName || '',
+            email: user.email || '',
             avatarUrl: user.avatarUrl || '',
-            bio: isTeacher ? teacher.bio : '',
-            hourlyRate: isTeacher ? teacher.hourlyRate.toString() : '',
-            subjects: isTeacher ? teacher.subjects.join(', ') : ''
+            bio: isTeacher ? (teacher.bio || '') : '',
+            hourlyRate: isTeacher ? (teacher.hourlyRate?.toString() || '') : '',
+            subjects: isTeacher ? (teacher.subjects?.join(', ') || '') : ''
         });
     }
   }, [user]);
@@ -63,7 +63,10 @@ const ProfileScreen = () => {
     if (user?.role === 'teacher') {
         updates.bio = formData.bio;
         updates.hourlyRate = parseFloat(formData.hourlyRate) || 0;
-        updates.subjects = formData.subjects.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        // Ensure we don't have empty strings in the array
+        updates.subjects = formData.subjects.split(',')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
     }
 
     updateProfile(updates);
@@ -88,7 +91,7 @@ const ProfileScreen = () => {
       
       {/* Success Toast */}
       {successMsg && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[110] bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
               <Check size={18} className="text-teal-400" />
               <span className="font-bold text-sm">{successMsg}</span>
           </div>
@@ -161,7 +164,7 @@ const ProfileScreen = () => {
                             </span>
                         </div>
                         <span className="block text-3xl font-extrabold text-slate-900">
-                            {user?.role === 'teacher' ? (user as Teacher).reviewsCount : user?.memorizedAyahs}
+                            {user?.role === 'teacher' ? (user as Teacher).reviewsCount || 0 : user?.memorizedAyahs || 0}
                         </span>
                     </div>
                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-amber-100 transition-colors">
@@ -185,11 +188,11 @@ const ProfileScreen = () => {
                         <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
                             <UserIcon size={18} className="text-indigo-500" /> About Me
                         </h3>
-                        <p className="text-slate-500 text-sm leading-relaxed">
+                        <p className="text-slate-500 text-sm leading-relaxed whitespace-pre-wrap">
                             {(user as Teacher).bio || "No bio added yet."}
                         </p>
                         <div className="flex flex-wrap gap-2 mt-4">
-                            {(user as Teacher).subjects.map(sub => (
+                            {(user as Teacher).subjects?.map(sub => (
                                 <span key={sub} className="px-3 py-1 bg-slate-50 border border-slate-100 text-slate-600 text-xs font-bold rounded-lg uppercase tracking-wide">
                                     {sub}
                                 </span>
@@ -323,7 +326,7 @@ const ProfileScreen = () => {
 
       {/* EDIT PROFILE MODAL */}
       {isEditing && (
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
               <div className="bg-white w-full max-w-md rounded-[2rem] max-h-[90vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-10">
                   <div className="sticky top-0 bg-white/80 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
                       <h2 className="text-xl font-bold text-slate-900">Edit Profile</h2>
@@ -336,7 +339,7 @@ const ProfileScreen = () => {
                       {/* Avatar Input */}
                       <div className="flex flex-col items-center gap-4 mb-6">
                            <div className="relative">
-                               <img src={formData.avatarUrl || `https://ui-avatars.com/api/?name=${formData.displayName}`} className="w-24 h-24 rounded-full object-cover border-4 border-slate-50" alt="Preview" />
+                               <img src={formData.avatarUrl || `https://ui-avatars.com/api/?name=${formData.displayName}`} className="w-24 h-24 rounded-full object-cover border-4 border-slate-50 bg-slate-100" alt="Preview" />
                                <div className="absolute bottom-0 right-0 p-1.5 bg-teal-500 rounded-full border-2 border-white text-white">
                                    <Camera size={14} />
                                </div>
@@ -373,10 +376,9 @@ const ProfileScreen = () => {
                               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                               <input 
                                   type="email" 
-                                  required 
                                   value={formData.email}
-                                  onChange={e => setFormData({...formData, email: e.target.value})}
-                                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-11 pr-4 focus:ring-2 focus:ring-teal-500 outline-none font-medium"
+                                  disabled
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-slate-500 font-medium cursor-not-allowed"
                               />
                           </div>
                       </div>
