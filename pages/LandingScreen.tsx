@@ -12,6 +12,13 @@ const LandingScreen = () => {
     navigate(`/auth?role=${role}`);
   };
 
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const reviews = [
       {
           id: 1,
@@ -49,8 +56,8 @@ const LandingScreen = () => {
             <span className="font-extrabold text-xl tracking-tight text-slate-900">QuranMemo</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">Features</a>
-            <a href="#mentors" className="text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">Mentors</a>
+            <button onClick={() => scrollToSection('features')} className="text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">Features</button>
+            <button onClick={() => scrollToSection('mentors')} className="text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">Mentors</button>
             
             {user ? (
                <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10">
@@ -162,7 +169,7 @@ const LandingScreen = () => {
       </section>
 
       {/* Feature Grid */}
-      <section className="py-24 bg-white" id="features">
+      <section className="py-24 bg-white scroll-mt-28" id="features">
          <div className="max-w-7xl mx-auto px-6">
             <div className="text-center max-w-2xl mx-auto mb-16">
                 <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4">Everything you need to succeed</h2>
@@ -208,7 +215,7 @@ const LandingScreen = () => {
       </section>
 
       {/* Top Rated Mentors Section */}
-      <section className="py-24 bg-slate-50 border-y border-slate-200" id="mentors">
+      <section className="py-24 bg-slate-50 border-y border-slate-200 scroll-mt-28" id="mentors">
           <div className="max-w-7xl mx-auto px-6">
               <div className="flex justify-between items-end mb-12">
                   <div>

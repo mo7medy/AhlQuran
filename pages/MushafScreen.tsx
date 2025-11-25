@@ -24,6 +24,16 @@ const MushafScreen = () => {
     loadSurahs();
   }, []);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   // Fetch Details on Select
   useEffect(() => {
     if (selectedSurah) {
@@ -39,17 +49,35 @@ const MushafScreen = () => {
 
   const toggleAudio = (ayah: Ayah) => {
     if (playingAyah === ayah.number) {
-      audioRef.current?.pause();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       setPlayingAyah(null);
     } else {
       if (audioRef.current) {
         audioRef.current.pause();
       }
       if (ayah.audio) {
-        audioRef.current = new Audio(ayah.audio);
-        audioRef.current.play();
+        const audio = new Audio(ayah.audio);
+        audioRef.current = audio;
         setPlayingAyah(ayah.number);
-        audioRef.current.onended = () => setPlayingAyah(null);
+        
+        audio.onended = () => setPlayingAyah(null);
+        
+        // Handle play promise to avoid "interrupted by pause" error
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            // AbortError is expected if user pauses immediately
+            if (error.name !== 'AbortError') {
+              console.error("Audio playback error:", error);
+            }
+            // Reset state if play failed (unless we switched to another ayah)
+            if (audioRef.current === audio && error.name !== 'AbortError') {
+                 setPlayingAyah(null);
+            }
+          });
+        }
       }
     }
   };
@@ -64,7 +92,7 @@ const MushafScreen = () => {
     <div className="flex flex-col h-full bg-[#faf7f0] relative">
       {/* Header */}
       <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm z-30 sticky top-0 border-b border-slate-100">
-        <button onClick={() => { setSelectedSurah(null); setPlayingAyah(null); }} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
+        <button onClick={() => { setSelectedSurah(null); setPlayingAyah(null); if(audioRef.current) audioRef.current.pause(); }} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
           <ChevronLeft size={24} />
         </button>
         

@@ -1,11 +1,16 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchSurahList, fetchSurahDetails } from '../services/quranApi';
 import { Surah, Ayah } from '../types';
+import { GoogleGenAI, Type } from "@google/genai";
 import { 
   Eye, EyeOff, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, 
   Settings, CheckCircle, AlertTriangle, XCircle, BarChart3, BookOpen, 
-  Volume2, ArrowRight, Award, Repeat
+  Volume2, ArrowRight, Award, Repeat, Mic, Square, Loader2, Wand2
 } from 'lucide-react';
+
+// Initialize Gemini AI
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 type SessionState = 'setup' | 'active' | 'summary';
 
@@ -13,6 +18,13 @@ interface SessionStats {
   perfect: number;
   good: number;
   forgot: number;
+}
+
+interface AIFeedback {
+    score: number;
+    isCorrect: boolean;
+    feedback: string;
+    highlightedHtml: string; // Arabic text with red spans for errors
 }
 
 const MemorizationScreen = () => {
@@ -33,6 +45,13 @@ const MemorizationScreen = () => {
   const [isTextHidden, setIsTextHidden] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [stats, setStats] = useState<SessionStats>({ perfect: 0, good: 0, forgot: 0 });
+  
+  // AI Listening State
+  const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<AIFeedback | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -65,13 +84,14 @@ const MemorizationScreen = () => {
     }
   }, [selectedSurah]);
 
-  // Audio Handler
+  // Audio Handler Cleanup
   useEffect(() => {
     return () => {
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current = null;
         }
+        stopRecording(); // Cleanup recorder if active
     };
   }, []);
 
@@ -82,10 +102,12 @@ const MemorizationScreen = () => {
     setStats({ perfect: 0, good: 0, forgot: 0 });
     setIsTextHidden(true);
     setSessionState('active');
+    setAiFeedback(null);
   };
 
   const handleGrade = (grade: 'perfect' | 'good' | 'forgot') => {
     setStats(prev => ({ ...prev, [grade]: prev[grade] + 1 }));
+    setAiFeedback(null); // Reset feedback for next card
     
     if (currentIndex < sessionAyahs.length - 1) {
         setCurrentIndex(prev => prev + 1);
@@ -103,13 +125,29 @@ const MemorizationScreen = () => {
     if (!sessionAyahs[currentIndex]?.audio) return;
 
     if (isPlaying) {
-        audioRef.current?.pause();
+        if (audioRef.current) audioRef.current.pause();
         setIsPlaying(false);
     } else {
-        audioRef.current = new Audio(sessionAyahs[currentIndex].audio);
-        audioRef.current.play();
+        // Cleanup old audio if exists
+        if (audioRef.current) {
+            audioRef.current.pause();
+        }
+
+        const audio = new Audio(sessionAyahs[currentIndex].audio);
+        audioRef.current = audio;
         setIsPlaying(true);
-        audioRef.current.onended = () => setIsPlaying(false);
+        audio.onended = () => setIsPlaying(false);
+
+        // Safe play
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                if (error.name !== 'AbortError') {
+                    console.error("Playback error:", error);
+                }
+                setIsPlaying(false);
+            });
+        }
     }
   };
 
@@ -118,7 +156,132 @@ const MemorizationScreen = () => {
       setStats({ perfect: 0, good: 0, forgot: 0 });
       setIsTextHidden(true);
       setSessionState('active');
+      setAiFeedback(null);
   };
+
+  // --- AI Listening Logic ---
+
+  const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            analyzeRecitation(audioBlob);
+            
+            // Stop all tracks to release mic
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+        setAiFeedback(null);
+    } catch (err) {
+        console.error("Error accessing microphone:", err);
+        alert("Microphone access is required to check your recitation.");
+    }
+  };
+
+  const stopRecording = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+      }
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            // Remove data url prefix (e.g. "data:audio/webm;base64,")
+            const base64Data = base64String.split(',')[1];
+            resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+  };
+
+  const analyzeRecitation = async (audioBlob: Blob) => {
+    setIsAnalyzing(true);
+    try {
+        const base64Audio = await blobToBase64(audioBlob);
+        const currentAyah = sessionAyahs[currentIndex];
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+                {
+                    role: "user",
+                    parts: [
+                        {
+                            inlineData: {
+                                mimeType: "audio/webm",
+                                data: base64Audio
+                            }
+                        },
+                        {
+                            text: `The user is reciting Surah ${selectedSurah?.englishName}, Ayah ${currentAyah.numberInSurah}. 
+                            The correct Arabic text is: "${currentAyah.text}".
+                            
+                            Task:
+                            1. Listen carefully to the recitation.
+                            2. Compare it to the correct Arabic text.
+                            3. Identify if there are missing words, wrong words, or major pronunciation errors.
+                            4. Return a JSON object with:
+                               - score: (0-100) based on accuracy.
+                               - isCorrect: boolean (true if minor or no mistakes).
+                               - feedback: A short, encouraging advice in English.
+                               - highlightedHtml: Return the EXACT original Arabic text provided above, but wrap any word that was missed or recited incorrectly in <span style='color:#ef4444; text-decoration: underline;'>WORD</span>. If the recitation was totally wrong or silent, just return the text in red.`
+                        }
+                    ]
+                }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        score: { type: Type.NUMBER },
+                        isCorrect: { type: Type.BOOLEAN },
+                        feedback: { type: Type.STRING },
+                        highlightedHtml: { type: Type.STRING }
+                    },
+                    required: ["score", "isCorrect", "feedback", "highlightedHtml"]
+                }
+            }
+        });
+
+        if (response.text) {
+            const result = JSON.parse(response.text) as AIFeedback;
+            setAiFeedback(result);
+            setIsTextHidden(false); // Reveal text to show mistakes
+        }
+
+    } catch (error) {
+        console.error("AI Analysis Failed:", error);
+        setAiFeedback({
+            score: 0,
+            isCorrect: false,
+            feedback: "Could not analyze audio. Please try again.",
+            highlightedHtml: sessionAyahs[currentIndex].text
+        });
+    } finally {
+        setIsAnalyzing(false);
+    }
+  };
+
+  // --- Render ---
 
   if (loading && !selectedSurah) {
       return (
@@ -245,10 +408,11 @@ const MemorizationScreen = () => {
                 <div className="flex-1 flex flex-col justify-center min-h-[300px]">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-50 p-8 md:p-12 relative overflow-hidden group">
                         
-                        {/* Audio Button */}
+                        {/* Audio Play Button */}
                         <button 
                             onClick={toggleAudio}
-                            className={`absolute top-6 left-6 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${isPlaying ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30 scale-110' : 'bg-slate-50 text-slate-400 hover:bg-teal-50 hover:text-teal-600'}`}
+                            disabled={isRecording}
+                            className={`absolute top-6 left-6 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${isPlaying ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30 scale-110' : 'bg-slate-50 text-slate-400 hover:bg-teal-50 hover:text-teal-600 disabled:opacity-50'}`}
                         >
                             {isPlaying ? <Pause size={20} fill="currentColor" /> : <Volume2 size={20} />}
                         </button>
@@ -261,18 +425,61 @@ const MemorizationScreen = () => {
                             {isTextHidden ? <Eye size={20} /> : <EyeOff size={20} />}
                         </button>
 
-                        {/* Arabic Text */}
+                        {/* Arabic Text (With AI Feedback Highlight support) */}
                         <div 
                             className={`text-center transition-all duration-500 my-10 ${isTextHidden ? 'blur-md opacity-20 select-none' : 'opacity-100 blur-0'}`}
                             onClick={() => isTextHidden && setIsTextHidden(false)}
                         >
-                            <p className="font-quran text-4xl md:text-5xl leading-[2.5] text-slate-800" dir="rtl">
-                                {sessionAyahs[currentIndex].text}
-                            </p>
+                            {aiFeedback ? (
+                                <p 
+                                    className="font-quran text-4xl md:text-5xl leading-[2.5] text-slate-800" 
+                                    dir="rtl"
+                                    dangerouslySetInnerHTML={{ __html: aiFeedback.highlightedHtml }}
+                                ></p>
+                            ) : (
+                                <p className="font-quran text-4xl md:text-5xl leading-[2.5] text-slate-800" dir="rtl">
+                                    {sessionAyahs[currentIndex].text}
+                                </p>
+                            )}
                         </div>
 
+                        {/* AI Feedback Box */}
+                        {aiFeedback && !isTextHidden && (
+                             <div className={`mt-4 p-4 rounded-2xl border flex items-start gap-3 ${aiFeedback.isCorrect ? 'bg-green-50 border-green-100 text-green-800' : 'bg-red-50 border-red-100 text-red-800'}`}>
+                                 <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${aiFeedback.isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
+                                     {aiFeedback.isCorrect ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+                                 </div>
+                                 <div>
+                                     <p className="font-bold text-sm mb-1">{aiFeedback.score}% Accuracy</p>
+                                     <p className="text-xs opacity-90">{aiFeedback.feedback}</p>
+                                 </div>
+                             </div>
+                        )}
+
+                        {/* Recording State Overlay */}
+                        {isRecording && (
+                             <div className="absolute inset-x-0 bottom-10 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4">
+                                <div className="flex gap-1 items-end h-8 mb-2">
+                                     <div className="w-1.5 bg-red-500 rounded-full animate-[bounce_1s_infinite] h-4"></div>
+                                     <div className="w-1.5 bg-red-500 rounded-full animate-[bounce_1.2s_infinite] h-8"></div>
+                                     <div className="w-1.5 bg-red-500 rounded-full animate-[bounce_0.8s_infinite] h-5"></div>
+                                     <div className="w-1.5 bg-red-500 rounded-full animate-[bounce_1.1s_infinite] h-7"></div>
+                                </div>
+                                <span className="text-red-500 font-bold text-xs uppercase tracking-widest animate-pulse">Listening...</span>
+                             </div>
+                        )}
+
+                        {/* Analyzing Overlay */}
+                        {isAnalyzing && (
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                                <Wand2 className="text-indigo-600 mb-4 animate-bounce" size={40} />
+                                <h3 className="font-bold text-slate-900 text-lg">AI Checking...</h3>
+                                <p className="text-slate-500 text-sm">Comparing your recitation</p>
+                            </div>
+                        )}
+
                         {/* Hint Text when hidden */}
-                        {isTextHidden && (
+                        {isTextHidden && !isRecording && (
                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <span className="bg-slate-900/5 backdrop-blur-sm text-slate-500 px-4 py-2 rounded-full text-sm font-bold border border-white/20">
                                     Tap to reveal
@@ -289,30 +496,53 @@ const MemorizationScreen = () => {
                 </div>
 
                 {/* Controls */}
-                <div className="mt-8 grid grid-cols-3 gap-4">
-                    <button 
-                        onClick={() => handleGrade('forgot')}
-                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors active:scale-95"
-                    >
-                        <XCircle size={24} />
-                        <span className="text-xs font-bold uppercase tracking-wide">Forgot</span>
-                    </button>
+                <div className="mt-8 space-y-4">
+                    {/* Recording Button */}
+                    <div className="flex justify-center">
+                        {isRecording ? (
+                            <button 
+                                onClick={stopRecording}
+                                className="flex items-center gap-3 px-8 py-4 bg-red-500 text-white rounded-full font-bold shadow-lg shadow-red-500/30 hover:bg-red-600 transition-all scale-105 active:scale-95"
+                            >
+                                <Square size={20} fill="currentColor" /> Stop
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={startRecording}
+                                disabled={isAnalyzing}
+                                className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-full font-bold shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+                            >
+                                <Mic size={20} className="group-hover:text-teal-400 transition-colors" /> Check Recitation
+                            </button>
+                        )}
+                    </div>
 
-                    <button 
-                        onClick={() => handleGrade('good')}
-                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 transition-colors active:scale-95"
-                    >
-                        <AlertTriangle size={24} />
-                        <span className="text-xs font-bold uppercase tracking-wide">Hard</span>
-                    </button>
+                    {/* Grading Buttons */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <button 
+                            onClick={() => handleGrade('forgot')}
+                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors active:scale-95"
+                        >
+                            <XCircle size={24} />
+                            <span className="text-xs font-bold uppercase tracking-wide">Forgot</span>
+                        </button>
 
-                    <button 
-                        onClick={() => handleGrade('perfect')}
-                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 hover:bg-teal-100 transition-colors active:scale-95"
-                    >
-                        <CheckCircle size={24} />
-                        <span className="text-xs font-bold uppercase tracking-wide">Perfect</span>
-                    </button>
+                        <button 
+                            onClick={() => handleGrade('good')}
+                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 transition-colors active:scale-95"
+                        >
+                            <AlertTriangle size={24} />
+                            <span className="text-xs font-bold uppercase tracking-wide">Hard</span>
+                        </button>
+
+                        <button 
+                            onClick={() => handleGrade('perfect')}
+                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 hover:bg-teal-100 transition-colors active:scale-95"
+                        >
+                            <CheckCircle size={24} />
+                            <span className="text-xs font-bold uppercase tracking-wide">Perfect</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         )}

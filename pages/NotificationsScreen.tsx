@@ -2,7 +2,7 @@ import React from 'react';
 import { useNotifications } from '../context/NotificationContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Bell, Check, Clock, AlertCircle, Info, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Bell, Clock, AlertCircle, Info, CheckCircle } from 'lucide-react';
 import { AppNotification } from '../types';
 
 const NotificationsScreen = () => {
@@ -91,7 +91,13 @@ const NotificationsScreen = () => {
   );
 };
 
-const NotificationItem = ({ notification, onClick, getIcon }: { notification: AppNotification, onClick: () => void, getIcon: any }) => (
+interface NotificationItemProps {
+  notification: AppNotification;
+  onClick: () => void;
+  getIcon: (type: AppNotification['type']) => React.ReactNode;
+}
+
+const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onClick, getIcon }) => (
     <div 
         onClick={onClick}
         className={`relative p-5 rounded-2xl border transition-all duration-300 cursor-pointer ${
