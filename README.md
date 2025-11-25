@@ -1,20 +1,46 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# QuranMemo - Islamic Studies & Hifz Platform
 
-# Run and deploy your AI Studio app
+A comprehensive React Native (Web/PWA) application dedicated to Quran memorization and Islamic studies learning.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1hqgFeIBSrPz_BmX9_9do1uRPV-KHsFWB
+- **Mushaf**: Full Quran reader with Audio, Tafsir, and Translation.
+- **Memorization**: Flashcard-style revision, AI recitation analysis, and progress tracking.
+- **AI Tutor**: Integrated Gemini 2.5 chatbot for Fiqh, Tajweed, and Tafsir queries.
+- **Marketplace**: Find teachers, view profiles, and book sessions.
+- **Social**: Chat system, Notifications, and Multi-language support (Arabic/English).
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- **Framework**: React 18 + Vite
+- **Styling**: Tailwind CSS + Tailwind Animate
+- **Icons**: Lucide React
+- **AI**: Google Gemini API (@google/genai)
+- **Deployment**: Ready for Vercel, Railway, or AWS Amplify.
 
+## Setup
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. **Install Dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Environment Variables**
+   Create a `.env` file in the root directory:
+   ```env
+   API_KEY=your_google_gemini_api_key
+   ```
+
+3. **Run Locally**
+   ```bash
+   npm run dev
+   ```
+
+4. **Build for Production**
+   ```bash
+   npm run build
+   ```
+
+## License
+
+MIT
