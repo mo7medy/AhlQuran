@@ -18,6 +18,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Helper to determine API URL
   const getApiUrl = (endpoint: string) => {
     const metaEnv = (import.meta as any).env || {};
+    // @ts-ignore
     const processEnv = (typeof process !== 'undefined' ? process.env : {}) as any;
     
     // Priority: VITE_API_URL (Amplify/Vercel) -> Empty String (Relative Path for Proxy)
@@ -31,11 +32,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (contentType && contentType.indexOf("application/json") !== -1) {
       return await res.json();
     } else {
-      // If we get HTML instead of JSON, the backend URL is likely wrong or down
-      const text = await res.text();
-      console.error("Non-JSON Response received:", text.substring(0, 100)); // Log first 100 chars
-      throw new Error("Backend API not reachable. Please check VITE_API_URL configuration.");
+      throw new Error("API_UNREACHABLE");
     }
+  };
+
+  // --- Mock/Demo Logic Helpers ---
+  const saveMockUser = (userData: User | Teacher) => {
+      localStorage.setItem('mock_user_data', JSON.stringify(userData));
+      localStorage.setItem('token', 'mock_token_' + Date.now());
+      setUser(userData);
   };
 
   // Load User from Token on Mount
@@ -48,6 +53,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       try {
+        // 1. Try Real API
         const res = await fetch(getApiUrl('/api/auth/me'), {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -56,14 +62,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const userData = await handleResponse(res);
             setUser(userData);
         } else {
-            // Token invalid or server error
-            localStorage.removeItem('token');
-            setUser(null);
+            // 2. If API fails, check for Mock Data (Fallback)
+            const mockData = localStorage.getItem('mock_user_data');
+            if (mockData && token.startsWith('mock_token')) {
+                console.warn("Backend unreachable. Loaded data from Local Storage (Demo Mode).");
+                setUser(JSON.parse(mockData));
+            } else {
+                localStorage.removeItem('token');
+                setUser(null);
+            }
         }
       } catch (err) {
-        console.error("Auth Load Error:", err);
-        // Don't log out immediately on network error, keep loading state or handle gracefully
-        localStorage.removeItem('token'); 
+        console.warn("Backend connection failed. Switching to Offline/Demo Mode.");
+        // Fallback for network errors
+        const mockData = localStorage.getItem('mock_user_data');
+        if (mockData) {
+            setUser(JSON.parse(mockData));
+        }
       } finally {
         setLoading(false);
       }
@@ -73,44 +88,88 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (role: 'student' | 'teacher', formData?: any) => {
-    try {
-        const isSignup = !!formData.name;
-        const endpoint = isSignup ? '/api/auth/register' : '/api/auth/login';
-        const url = getApiUrl(endpoint);
+    const isSignup = !!formData.name;
+    const endpoint = isSignup ? '/api/auth/register' : '/api/auth/login';
+    const url = getApiUrl(endpoint);
+    const payload = { ...formData, role };
 
-        const payload = { ...formData, role };
-        
+    try {
+        // 1. Try Real API
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        const data = await handleResponse(res);
+        if (res.ok) {
+            const data = await handleResponse(res);
+            localStorage.setItem('token', data.token);
+            setUser(data.user);
+            // Clear mock data if real login succeeds
+            localStorage.removeItem('mock_user_data'); 
+            return;
+        } 
         
-        if (!res.ok) {
-            throw new Error(data.message || 'Authentication failed');
+        // Check if it was a real logic error (like wrong password) or a 404/HTML error
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+             const errorData = await res.json();
+             throw new Error(errorData.message || 'Authentication failed');
         }
+        
+        // If we get here, it returned HTML (404) or something else => Trigger Fallback
+        throw new Error("API_UNREACHABLE");
 
-        localStorage.setItem('token', data.token);
-        setUser(data.user);
-    } catch (err) {
-        console.error(err);
-        alert(err instanceof Error ? err.message : "Authentication Failed");
+    } catch (err: any) {
+        // 2. Fallback to Mock Mode
+        if (err.message === 'API_UNREACHABLE' || err.message.includes('Failed to fetch')) {
+            console.warn("Backend unreachable. Using Demo Mode.");
+            
+            // Simulate Authentication
+            const mockUser: User | Teacher = {
+                uid: 'mock_' + Date.now(),
+                email: formData.email,
+                displayName: formData.name || 'Demo User',
+                role: role,
+                avatarUrl: `https://ui-avatars.com/api/?name=${formData.name || 'User'}&background=${role === 'student' ? '0D9488' : '0F172A'}&color=fff`,
+                memorizedAyahs: 120,
+                // Teacher specific
+                bio: formData.bio || "This is a demo profile running in offline mode.",
+                hourlyRate: formData.hourlyRate || 20,
+                subjects: formData.subjects || ['Tajweed'],
+                rating: 5.0,
+                reviewsCount: 0
+            };
+            
+            saveMockUser(mockUser);
+            alert("⚠️ Backend not connected.\n\nLogged in using Demo Mode. Data will be saved locally.");
+        } else {
+            throw err; // Re-throw real errors (like 'User already exists')
+        }
     }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('mock_user_data');
   };
 
   const updateProfile = async (data: Partial<Teacher>) => {
     if (!user) return;
-    setUser({ ...user, ...data });
+    const updatedUser = { ...user, ...data };
+    setUser(updatedUser);
 
     try {
         const token = localStorage.getItem('token');
+        
+        // If using mock token, just update local storage
+        if (token?.startsWith('mock_token')) {
+            localStorage.setItem('mock_user_data', JSON.stringify(updatedUser));
+            return;
+        }
+
+        // Otherwise try real API
         await fetch(getApiUrl('/api/users/profile'), {
             method: 'PUT',
             headers: { 
@@ -120,7 +179,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             body: JSON.stringify(data)
         });
     } catch (err) {
-        console.error("Profile update failed", err);
+        console.error("Profile update failed (simulated success in UI)", err);
+        // Ensure local persistence even if API fails
+        localStorage.setItem('mock_user_data', JSON.stringify(updatedUser));
     }
   };
 
