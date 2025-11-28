@@ -5,15 +5,16 @@ import { Surah, Ayah } from '../types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { 
   Eye, EyeOff, Play, Pause, RotateCcw, ChevronLeft, ArrowRight, 
-  Settings, CheckCircle, AlertTriangle, Mic, Square, Loader2, Wand2, BookOpen, ChevronRight, RefreshCw
+  Settings, CheckCircle, AlertTriangle, Mic, Square, Loader2, Wand2, BookOpen, ChevronRight, RefreshCw, XCircle
 } from 'lucide-react';
 
 type SessionState = 'setup' | 'active' | 'summary';
-type WordStatus = 'hidden' | 'correct' | 'wrong' | 'revealed';
+type WordStatus = 'hidden' | 'revealed' | 'correct' | 'wrong';
 
 interface WordData {
     id: number;
     text: string;
+    cleanText: string; // Text without diacritics for matching
     status: WordStatus;
 }
 
@@ -22,6 +23,11 @@ interface AyahProgress {
     words: WordData[];
     isCompleted: boolean;
 }
+
+// Utility to remove Tashkeel (Diacritics) for fuzzy matching
+const removeDiacritics = (text: string) => {
+    return text.normalize("NFD").replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, "");
+};
 
 const MemorizationScreen = () => {
   // Data State
@@ -43,9 +49,11 @@ const MemorizationScreen = () => {
   // Interaction State
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState('');
   
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const speechRecognitionRef = useRef<any>(null); // Browser native speech recognition
   const audioChunksRef = useRef<Blob[]>([]);
   const activeAyahRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -82,7 +90,7 @@ const MemorizationScreen = () => {
       if (sessionState === 'active' && activeAyahRef.current) {
           setTimeout(() => {
             activeAyahRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 100);
+          }, 300);
       }
   }, [currentIndex, sessionState]);
 
@@ -97,7 +105,8 @@ const MemorizationScreen = () => {
         words: a.text.split(' ').map((word, idx) => ({
             id: idx,
             text: word,
-            status: 'hidden'
+            cleanText: removeDiacritics(word),
+            status: 'hidden' as WordStatus
         }))
     }));
     
@@ -106,18 +115,79 @@ const MemorizationScreen = () => {
     setSessionState('active');
   };
 
-  // --- AI Listening Logic ---
+  // --- Real-Time Speech Matching ---
+  
+  const setupSpeechRecognition = () => {
+    // @ts-ignore - SpeechRecognition is not standard in all TS lib versions yet
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'ar-SA'; // Listen for Arabic
+
+    recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            interimTranscript += event.results[i][0].transcript;
+        }
+        
+        setLiveTranscript(interimTranscript);
+        matchSpeechToText(interimTranscript);
+    };
+
+    return recognition;
+  };
+
+  const matchSpeechToText = (transcript: string) => {
+      // Fuzzy match transcript words to the hidden Ayah words
+      const cleanTranscript = removeDiacritics(transcript);
+      const transcriptWords = cleanTranscript.split(' ');
+      
+      setProgress(prev => {
+          const newProgress = [...prev];
+          const currentWords = newProgress[currentIndex].words;
+          
+          let updated = false;
+          const updatedWords = currentWords.map(w => {
+              // If already revealed or correct, skip
+              if (w.status !== 'hidden') return w;
+
+              // Check if any word in the transcript loosely matches this word
+              // We check the last few words spoken to allow for flow
+              const isMatch = transcriptWords.some(tw => {
+                  // Allow for slight differences (e.g. ignoring Alef types)
+                  const tNorm = tw.replace(/[أإآ]/g, 'ا');
+                  const wNorm = w.cleanText.replace(/[أإآ]/g, 'ا');
+                  return tNorm === wNorm || (wNorm.length > 3 && tNorm.includes(wNorm));
+              });
+
+              if (isMatch) {
+                  updated = true;
+                  return { ...w, status: 'revealed' as WordStatus };
+              }
+              return w;
+          });
+
+          if (updated) {
+            newProgress[currentIndex] = { ...newProgress[currentIndex], words: updatedWords };
+            return newProgress;
+          }
+          return prev;
+      });
+  };
+
+  // --- Audio Recording & AI ---
 
   const startRecording = async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Use intelligent mimeType detection for Safari/iOS vs Chrome support
+        
+        // 1. Setup Media Recorder (For Gemini)
         let mimeType = 'audio/webm';
-        if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            mimeType = 'audio/mp4';
-        } else if (MediaRecorder.isTypeSupported('audio/acc')) {
-            mimeType = 'audio/acc';
-        }
+        if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+        else if (MediaRecorder.isTypeSupported('audio/acc')) mimeType = 'audio/acc';
 
         const mediaRecorder = new MediaRecorder(stream, { mimeType });
         mediaRecorderRef.current = mediaRecorder;
@@ -133,8 +203,16 @@ const MemorizationScreen = () => {
             stream.getTracks().forEach(track => track.stop());
         };
 
+        // 2. Setup Speech Recognition (For Real-time Visuals)
+        const recognition = setupSpeechRecognition();
+        if (recognition) {
+            recognition.start();
+            speechRecognitionRef.current = recognition;
+        }
+
         mediaRecorder.start();
         setIsRecording(true);
+        setLiveTranscript('');
     } catch (err) {
         console.error("Mic Error:", err);
         alert("Microphone access needed. Please check permissions.");
@@ -144,8 +222,11 @@ const MemorizationScreen = () => {
   const stopRecording = () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
           mediaRecorderRef.current.stop();
-          setIsRecording(false);
       }
+      if (speechRecognitionRef.current) {
+          speechRecognitionRef.current.stop();
+      }
+      setIsRecording(false);
   };
 
   const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -179,11 +260,11 @@ const MemorizationScreen = () => {
                             Expected Text: "${currentAyah.text}"
                             
                             Task:
-                            1. Transcribe the audio and compare strictly with Expected Text.
-                            2. Return a JSON object with a list 'results'.
-                            3. 'results' must contain objects: { "word": string, "status": "correct" | "wrong" }.
-                            4. Map strictly to the words of the Expected Text in order.
-                            5. If a word is missed or mispronounced, mark as 'wrong'.
+                            1. Strictly transcribe what was said.
+                            2. Compare word-by-word with the Expected Text.
+                            3. Return JSON 'results' array.
+                            4. Each item: { "word": string (from expected text), "status": "correct" | "wrong" }.
+                            5. If a word is NOT said, mark it "wrong".
                         `}
                     ]
                 }
@@ -216,9 +297,11 @@ const MemorizationScreen = () => {
         }
     } catch (error) {
         console.error("AI Error:", error);
-        alert("Analysis failed. Please try again.");
+        // On error, reveal everything so user isn't stuck
+        handleRevealAll();
     } finally {
         setIsAnalyzing(false);
+        setLiveTranscript('');
     }
   };
 
@@ -228,19 +311,18 @@ const MemorizationScreen = () => {
       
       let allCorrect = true;
 
-      // Map AI results to local words
-      // Simple mapping by index for now, assuming AI returns 1:1 mapping
-      // In prod, robust diffing algorithms (like diff-match-patch) would be better
       const updatedWords = currentWords.map((w, idx) => {
           const aiRes = results[idx];
-          if (!aiRes) return w; // No result for this word
-
-          if (aiRes.status === 'wrong') {
+          // Use AI result if available, otherwise assume wrong if strict
+          if (aiRes && aiRes.status === 'wrong') {
               allCorrect = false;
               return { ...w, status: 'wrong' as WordStatus };
-          } else {
+          } else if (aiRes && aiRes.status === 'correct') {
               return { ...w, status: 'correct' as WordStatus };
           }
+          // Fallback: If not in AI result but was revealed by Speech API, keep revealed?
+          // No, let's reveal it as correct to be lenient if AI didn't explicitly flag it
+          return w.status === 'revealed' ? { ...w, status: 'correct' as WordStatus } : w;
       });
 
       newProgress[currentIndex] = {
@@ -250,6 +332,13 @@ const MemorizationScreen = () => {
       };
       
       setProgress(newProgress);
+      
+      // Auto-advance if fully correct
+      if (allCorrect) {
+          setTimeout(() => {
+              handleNext();
+          }, 1500);
+      }
   };
 
   const handleRevealAll = () => {
@@ -310,17 +399,14 @@ const MemorizationScreen = () => {
              </div>
          </div>
          {sessionState === 'active' && (
-             <div className="flex items-center gap-2">
-                 <div className="h-2 w-24 bg-slate-100 rounded-full overflow-hidden">
-                     <div className="h-full bg-teal-500 transition-all duration-500" style={{ width: `${(currentIndex / sessionAyahs.length) * 100}%` }}></div>
-                 </div>
-                 <span className="text-xs font-bold text-slate-400">{Math.round((currentIndex / sessionAyahs.length) * 100)}%</span>
-             </div>
+             <button onClick={() => setSessionState('summary')} className="p-2 text-slate-400 hover:text-red-500">
+                 <XCircle size={20} />
+             </button>
          )}
       </header>
 
       {/* CONTENT */}
-      <main className="flex-1 overflow-y-auto relative pb-40" ref={scrollContainerRef}>
+      <main className="flex-1 overflow-y-auto relative pb-56" ref={scrollContainerRef}>
         
         {/* SETUP VIEW */}
         {sessionState === 'setup' && (
@@ -412,51 +498,28 @@ const MemorizationScreen = () => {
                              {/* Word-by-Word Rendering */}
                              <div className="flex flex-wrap flex-row-reverse gap-x-2 gap-y-4 justify-center py-4 px-2" dir="rtl">
                                 {ayahProgress?.words.map((w, wIdx) => {
-                                    const isRevealed = w.status === 'correct' || w.status === 'revealed';
+                                    // Status Logic
+                                    const isRevealed = w.status === 'revealed';
+                                    const isCorrect = w.status === 'correct';
                                     const isWrong = w.status === 'wrong';
-                                    
+                                    const isHidden = w.status === 'hidden';
+
+                                    let styleClass = "text-slate-800"; // Default
+                                    if (isHidden) styleClass = "text-transparent bg-slate-200/50 rounded-lg blur-[2px] select-none";
+                                    if (isRevealed) styleClass = "text-slate-800 animate-in fade-in";
+                                    if (isCorrect) styleClass = "text-teal-700 font-bold";
+                                    if (isWrong) styleClass = "text-red-500 decoration-red-400 underline underline-offset-8 decoration-wavy";
+
                                     return (
                                         <span 
                                             key={wIdx}
-                                            className={`font-quran text-3xl md:text-4xl transition-all duration-500 rounded-lg px-1 ${
-                                                isActive 
-                                                    ? isWrong 
-                                                        ? 'text-red-500 decoration-red-400 underline underline-offset-8 decoration-wavy'
-                                                        : isRevealed 
-                                                            ? 'text-teal-800' 
-                                                            : 'text-transparent bg-slate-100 rounded-md blur-sm select-none'
-                                                    : 'text-slate-800'
-                                            }`}
+                                            className={`font-quran text-3xl md:text-4xl transition-all duration-300 px-1 ${styleClass}`}
                                         >
                                             {w.text}
                                         </span>
                                     );
                                 })}
                              </div>
-
-                             {/* Actions for Active Card */}
-                             {isActive && (
-                                <div className="flex justify-center gap-4 mt-8 pt-4 border-t border-slate-50">
-                                    <button 
-                                        onClick={handleRevealAll}
-                                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 text-sm font-bold transition-colors"
-                                    >
-                                        <Eye size={16} /> Reveal
-                                    </button>
-                                    <button 
-                                        onClick={resetCurrent}
-                                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 text-sm font-bold transition-colors"
-                                    >
-                                        <RefreshCw size={16} /> Reset
-                                    </button>
-                                    <button 
-                                        onClick={handleNext}
-                                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold hover:bg-slate-800 transition-colors"
-                                    >
-                                        Next <ChevronRight size={16} />
-                                    </button>
-                                </div>
-                             )}
                         </div>
                     );
                 })}
@@ -484,49 +547,63 @@ const MemorizationScreen = () => {
 
       </main>
 
-      {/* BOTTOM ACTION BAR (Active Only) */}
+      {/* BOTTOM ACTION BAR (Sticky above nav) */}
       {sessionState === 'active' && (
-        <div className="absolute bottom-0 w-full p-6 bg-gradient-to-t from-white via-white to-transparent z-30 flex justify-center pb-safe">
-            <div className="flex items-center gap-6">
+        <div className="fixed bottom-[85px] md:bottom-10 left-0 right-0 z-[60] flex flex-col items-center pointer-events-none">
+            
+            {/* Live Transcript Bubble */}
+            {isRecording && liveTranscript && (
+                <div className="bg-slate-900/80 backdrop-blur-md text-white px-4 py-2 rounded-2xl mb-4 text-sm font-quran max-w-[80%] text-center animate-in fade-in slide-in-from-bottom-2">
+                    {liveTranscript}
+                </div>
+            )}
+
+            {/* Controls Container */}
+            <div className="bg-white/90 backdrop-blur-xl border border-slate-200/60 shadow-2xl shadow-slate-300/50 rounded-full px-6 py-3 flex items-center gap-6 pointer-events-auto">
                 <button 
                    onClick={handlePrev}
                    disabled={currentIndex === 0}
-                   className="w-12 h-12 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center disabled:opacity-30"
+                   className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 flex items-center justify-center disabled:opacity-30 transition-colors"
                 >
-                    <ChevronLeft size={24} />
+                    <ChevronLeft size={20} />
                 </button>
 
                 {isRecording ? (
                     <button 
                         onClick={stopRecording}
-                        className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center text-white shadow-2xl shadow-red-500/40 animate-pulse scale-110"
+                        className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center text-white shadow-xl shadow-red-500/30 animate-pulse scale-105"
                     >
-                        <Square size={32} fill="currentColor" />
+                        <Square size={24} fill="currentColor" />
                     </button>
                 ) : isAnalyzing ? (
-                    <div className="w-20 h-20 bg-white border-4 border-indigo-100 rounded-full flex flex-col items-center justify-center shadow-xl animate-bounce">
+                    <div className="w-16 h-16 bg-indigo-50 border-2 border-indigo-500 border-t-transparent rounded-full flex items-center justify-center animate-spin">
                         <Wand2 className="text-indigo-600" size={24} />
                     </div>
                 ) : (
                     <button 
                         onClick={startRecording}
-                        className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center text-white shadow-2xl shadow-slate-900/40 hover:scale-105 active:scale-95 transition-all group"
+                        className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center text-white shadow-xl shadow-slate-900/30 hover:scale-105 active:scale-95 transition-all group"
                     >
-                        <Mic size={32} className="group-hover:text-teal-400 transition-colors" />
+                        <Mic size={28} className="group-hover:text-teal-400 transition-colors" />
                     </button>
                 )}
 
-                <button 
-                   onClick={handleNext}
-                   className="w-12 h-12 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-teal-600 hover:border-teal-200 flex items-center justify-center"
-                >
-                    <ArrowRight size={24} />
-                </button>
-            </div>
-            
-            {/* Helper Text */}
-            <div className="absolute bottom-10 right-8 md:right-auto md:left-2/3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:block">
-                {isRecording ? "Listening..." : isAnalyzing ? "Checking..." : "Tap to Recite"}
+                <div className="flex gap-2">
+                    <button 
+                        onClick={handleRevealAll}
+                        className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:text-teal-600 hover:bg-teal-50 flex items-center justify-center transition-colors"
+                        title="Reveal Ayah"
+                    >
+                        <Eye size={20} />
+                    </button>
+                    <button 
+                    onClick={handleNext}
+                    className="w-10 h-10 rounded-full bg-slate-900 text-white hover:bg-slate-800 flex items-center justify-center transition-colors"
+                    title="Next Ayah"
+                    >
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
             </div>
         </div>
       )}
