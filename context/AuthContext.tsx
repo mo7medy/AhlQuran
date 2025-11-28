@@ -16,7 +16,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   // Helper to determine API URL
-  // Safely checks import.meta.env and process.env to prevent crashes
   const getApiUrl = (endpoint: string) => {
     const metaEnv = (import.meta as any).env || {};
     const processEnv = (typeof process !== 'undefined' ? process.env : {}) as any;
@@ -24,6 +23,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Priority: VITE_API_URL (Amplify/Vercel) -> Empty String (Relative Path for Proxy)
     const baseUrl = metaEnv.VITE_API_URL || processEnv.VITE_API_URL || '';
     return `${baseUrl}${endpoint}`;
+  };
+
+  // Helper to safely parse JSON response
+  const handleResponse = async (res: Response) => {
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+      return await res.json();
+    } else {
+      // If we get HTML instead of JSON, the backend URL is likely wrong or down
+      const text = await res.text();
+      console.error("Non-JSON Response received:", text.substring(0, 100)); // Log first 100 chars
+      throw new Error("Backend API not reachable. Please check VITE_API_URL configuration.");
+    }
   };
 
   // Load User from Token on Mount
@@ -41,15 +53,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
         
         if (res.ok) {
-            const userData = await res.json();
+            const userData = await handleResponse(res);
             setUser(userData);
         } else {
+            // Token invalid or server error
             localStorage.removeItem('token');
             setUser(null);
         }
       } catch (err) {
         console.error("Auth Load Error:", err);
-        localStorage.removeItem('token');
+        // Don't log out immediately on network error, keep loading state or handle gracefully
+        localStorage.removeItem('token'); 
       } finally {
         setLoading(false);
       }
@@ -72,7 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        const data = await handleResponse(res);
         
         if (!res.ok) {
             throw new Error(data.message || 'Authentication failed');
