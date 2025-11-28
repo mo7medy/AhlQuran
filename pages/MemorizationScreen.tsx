@@ -5,16 +5,22 @@ import { Surah, Ayah } from '../types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { 
   Eye, EyeOff, Play, Pause, RotateCcw, ChevronLeft, ArrowRight, 
-  Settings, CheckCircle, AlertTriangle, Mic, Square, Loader2, Wand2, BookOpen
+  Settings, CheckCircle, AlertTriangle, Mic, Square, Loader2, Wand2, BookOpen, ChevronRight, RefreshCw
 } from 'lucide-react';
 
 type SessionState = 'setup' | 'active' | 'summary';
-type AyahStatus = 'locked' | 'current' | 'correct' | 'mistake' | 'revealed';
+type WordStatus = 'hidden' | 'correct' | 'wrong' | 'revealed';
+
+interface WordData {
+    id: number;
+    text: string;
+    status: WordStatus;
+}
 
 interface AyahProgress {
     ayahNumber: number;
-    status: AyahStatus;
-    htmlContent?: string; // For error highlighting
+    words: WordData[];
+    isCompleted: boolean;
 }
 
 const MemorizationScreen = () => {
@@ -35,7 +41,6 @@ const MemorizationScreen = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
   // Interaction State
-  const [isPeeking, setIsPeeking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
@@ -75,7 +80,9 @@ const MemorizationScreen = () => {
   // Auto-scroll to current ayah
   useEffect(() => {
       if (sessionState === 'active' && activeAyahRef.current) {
-          activeAyahRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => {
+            activeAyahRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
       }
   }, [currentIndex, sessionState]);
 
@@ -83,11 +90,16 @@ const MemorizationScreen = () => {
     const filtered = ayahs.filter(a => a.numberInSurah >= rangeStart && a.numberInSurah <= rangeEnd);
     setSessionAyahs(filtered);
     
-    // Initialize Progress: First is 'current', rest 'locked'
-    const initialProgress = filtered.map((a, idx) => ({
+    // Initialize Progress: Split words
+    const initialProgress = filtered.map((a) => ({
         ayahNumber: a.numberInSurah,
-        status: idx === 0 ? 'current' : 'locked'
-    } as AyahProgress));
+        isCompleted: false,
+        words: a.text.split(' ').map((word, idx) => ({
+            id: idx,
+            text: word,
+            status: 'hidden'
+        }))
+    }));
     
     setProgress(initialProgress);
     setCurrentIndex(0);
@@ -99,7 +111,15 @@ const MemorizationScreen = () => {
   const startRecording = async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
+        // Use intelligent mimeType detection for Safari/iOS vs Chrome support
+        let mimeType = 'audio/webm';
+        if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/acc')) {
+            mimeType = 'audio/acc';
+        }
+
+        const mediaRecorder = new MediaRecorder(stream, { mimeType });
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
 
@@ -108,8 +128,8 @@ const MemorizationScreen = () => {
         };
 
         mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            analyzeRecitation(audioBlob);
+            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+            analyzeRecitation(audioBlob, mimeType);
             stream.getTracks().forEach(track => track.stop());
         };
 
@@ -117,7 +137,7 @@ const MemorizationScreen = () => {
         setIsRecording(true);
     } catch (err) {
         console.error("Mic Error:", err);
-        alert("Microphone access needed.");
+        alert("Microphone access needed. Please check permissions.");
     }
   };
 
@@ -137,7 +157,7 @@ const MemorizationScreen = () => {
     });
   };
 
-  const analyzeRecitation = async (audioBlob: Blob) => {
+  const analyzeRecitation = async (audioBlob: Blob, mimeType: string) => {
     setIsAnalyzing(true);
     try {
         const apiKey = process.env.API_KEY || '';
@@ -153,16 +173,17 @@ const MemorizationScreen = () => {
                 {
                     role: "user",
                     parts: [
-                        { inlineData: { mimeType: "audio/webm", data: base64Audio } },
+                        { inlineData: { mimeType: mimeType, data: base64Audio } },
                         { text: `
                             Reciter is reciting Surah ${selectedSurah?.englishName}, Ayah ${currentAyah.numberInSurah}.
-                            Correct Text: "${currentAyah.text}"
+                            Expected Text: "${currentAyah.text}"
                             
                             Task:
-                            1. Strictly compare recitation to the Arabic text.
-                            2. If > 90% accurate (minor tajweed ignored), return isCorrect: true.
-                            3. If wrong/missing words, return isCorrect: false.
-                            4. Return 'htmlContent': The exact Arabic text. Wrap WRONG/MISSED words in <span style="color:#ef4444; text-decoration: underline;">WORD</span>.
+                            1. Transcribe the audio and compare strictly with Expected Text.
+                            2. Return a JSON object with a list 'results'.
+                            3. 'results' must contain objects: { "word": string, "status": "correct" | "wrong" }.
+                            4. Map strictly to the words of the Expected Text in order.
+                            5. If a word is missed or mispronounced, mark as 'wrong'.
                         `}
                     ]
                 }
@@ -172,52 +193,90 @@ const MemorizationScreen = () => {
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        isCorrect: { type: Type.BOOLEAN },
-                        htmlContent: { type: Type.STRING }
+                        results: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    word: { type: Type.STRING },
+                                    status: { type: Type.STRING, enum: ["correct", "wrong"] }
+                                },
+                                required: ["word", "status"]
+                            }
+                        }
                     },
-                    required: ["isCorrect", "htmlContent"]
+                    required: ["results"]
                 }
             }
         });
 
         if (response.text) {
             const result = JSON.parse(response.text);
-            handleAiResult(result.isCorrect, result.htmlContent);
+            handleAiResult(result.results);
         }
     } catch (error) {
         console.error("AI Error:", error);
-        alert("Analysis failed. Try again.");
+        alert("Analysis failed. Please try again.");
     } finally {
         setIsAnalyzing(false);
     }
   };
 
-  const handleAiResult = (isCorrect: boolean, htmlContent: string) => {
+  const handleAiResult = (results: { word: string, status: 'correct' | 'wrong' }[]) => {
       const newProgress = [...progress];
+      const currentWords = newProgress[currentIndex].words;
       
-      if (isCorrect) {
-          // Mark current as correct
-          newProgress[currentIndex] = { ...newProgress[currentIndex], status: 'correct', htmlContent: undefined };
-          
-          // Move to next if available
-          if (currentIndex < sessionAyahs.length - 1) {
-              const nextIndex = currentIndex + 1;
-              newProgress[nextIndex] = { ...newProgress[nextIndex], status: 'current' };
-              setCurrentIndex(nextIndex);
+      let allCorrect = true;
+
+      // Map AI results to local words
+      // Simple mapping by index for now, assuming AI returns 1:1 mapping
+      // In prod, robust diffing algorithms (like diff-match-patch) would be better
+      const updatedWords = currentWords.map((w, idx) => {
+          const aiRes = results[idx];
+          if (!aiRes) return w; // No result for this word
+
+          if (aiRes.status === 'wrong') {
+              allCorrect = false;
+              return { ...w, status: 'wrong' as WordStatus };
           } else {
-              setSessionState('summary');
+              return { ...w, status: 'correct' as WordStatus };
           }
-      } else {
-          // Mark as mistake
-          newProgress[currentIndex] = { ...newProgress[currentIndex], status: 'mistake', htmlContent };
-      }
+      });
+
+      newProgress[currentIndex] = {
+          ...newProgress[currentIndex],
+          words: updatedWords,
+          isCompleted: allCorrect
+      };
       
       setProgress(newProgress);
   };
 
-  const handleManualCorrect = () => {
-      // Allow user to manually mark as correct if AI fails or they just want to read
-      handleAiResult(true, "");
+  const handleRevealAll = () => {
+      const newProgress = [...progress];
+      newProgress[currentIndex].words = newProgress[currentIndex].words.map(w => ({ ...w, status: 'revealed' }));
+      setProgress(newProgress);
+  };
+
+  const handleNext = () => {
+      if (currentIndex < sessionAyahs.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+      } else {
+          setSessionState('summary');
+      }
+  };
+
+  const handlePrev = () => {
+      if (currentIndex > 0) {
+          setCurrentIndex(prev => prev - 1);
+      }
+  };
+
+  const resetCurrent = () => {
+      const newProgress = [...progress];
+      newProgress[currentIndex].words = newProgress[currentIndex].words.map(w => ({ ...w, status: 'hidden' }));
+      newProgress[currentIndex].isCompleted = false;
+      setProgress(newProgress);
   };
 
   // --- Render ---
@@ -261,7 +320,7 @@ const MemorizationScreen = () => {
       </header>
 
       {/* CONTENT */}
-      <main className="flex-1 overflow-y-auto relative pb-32" ref={scrollContainerRef}>
+      <main className="flex-1 overflow-y-auto relative pb-40" ref={scrollContainerRef}>
         
         {/* SETUP VIEW */}
         {sessionState === 'setup' && (
@@ -327,77 +386,80 @@ const MemorizationScreen = () => {
         {sessionState === 'active' && (
             <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
                 {sessionAyahs.map((ayah, index) => {
-                    const status = progress[index]?.status || 'locked';
-                    const isCurrent = status === 'current' || status === 'mistake';
-                    const isLocked = status === 'locked';
-                    const isCorrect = status === 'correct';
-                    const isMistake = status === 'mistake';
+                    const isActive = index === currentIndex;
+                    const ayahProgress = progress[index];
+                    const isCompleted = ayahProgress?.isCompleted;
                     
-                    // Dynamic classes for blur/reveal
-                    let contentClass = "transition-all duration-700 font-quran text-3xl md:text-4xl leading-[2.6] text-center dir-rtl";
-                    if (isLocked) contentClass += " blur-md opacity-20 select-none grayscale";
-                    if (isCurrent && !isPeeking && !isMistake) contentClass += " blur-lg opacity-40 select-none"; 
-                    if (isCurrent && isPeeking) contentClass += " blur-0 opacity-100 text-slate-800";
-                    if (isCorrect) contentClass += " blur-0 opacity-100 text-teal-700";
-                    if (isMistake) contentClass += " blur-0 opacity-100 text-slate-900";
-
                     return (
                         <div 
                             key={ayah.number}
-                            ref={isCurrent ? activeAyahRef : null}
+                            ref={isActive ? activeAyahRef : null}
                             className={`relative p-6 rounded-[2rem] transition-all duration-500 border-2 ${
-                                isCurrent ? 'bg-white border-teal-500 shadow-2xl shadow-teal-500/10 scale-105 z-10' 
-                                : isCorrect ? 'bg-teal-50/50 border-transparent opacity-80'
-                                : 'bg-transparent border-transparent opacity-50'
+                                isActive ? 'bg-white border-teal-500 shadow-2xl shadow-teal-500/10 scale-100 z-10' 
+                                : isCompleted ? 'bg-teal-50/50 border-transparent opacity-60'
+                                : 'bg-transparent border-transparent opacity-40'
                             }`}
                         >
                              {/* Status Badge */}
                              <div className="absolute top-4 left-4">
                                 <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold ${
-                                    isCurrent ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-400'
+                                    isActive ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-400'
                                 }`}>
                                     {ayah.numberInSurah}
                                 </span>
                              </div>
 
-                             {/* Content */}
-                             <div className={contentClass}>
-                                {isMistake && progress[index].htmlContent ? (
-                                    <span dangerouslySetInnerHTML={{ __html: progress[index].htmlContent! }} />
-                                ) : (
-                                    ayah.text
-                                )}
+                             {/* Word-by-Word Rendering */}
+                             <div className="flex flex-wrap flex-row-reverse gap-x-2 gap-y-4 justify-center py-4 px-2" dir="rtl">
+                                {ayahProgress?.words.map((w, wIdx) => {
+                                    const isRevealed = w.status === 'correct' || w.status === 'revealed';
+                                    const isWrong = w.status === 'wrong';
+                                    
+                                    return (
+                                        <span 
+                                            key={wIdx}
+                                            className={`font-quran text-3xl md:text-4xl transition-all duration-500 rounded-lg px-1 ${
+                                                isActive 
+                                                    ? isWrong 
+                                                        ? 'text-red-500 decoration-red-400 underline underline-offset-8 decoration-wavy'
+                                                        : isRevealed 
+                                                            ? 'text-teal-800' 
+                                                            : 'text-transparent bg-slate-100 rounded-md blur-sm select-none'
+                                                    : 'text-slate-800'
+                                            }`}
+                                        >
+                                            {w.text}
+                                        </span>
+                                    );
+                                })}
                              </div>
 
-                             {/* Context Actions for Current Card */}
-                             {isCurrent && (
-                                <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 flex gap-2">
+                             {/* Actions for Active Card */}
+                             {isActive && (
+                                <div className="flex justify-center gap-4 mt-8 pt-4 border-t border-slate-50">
                                     <button 
-                                        onMouseDown={() => setIsPeeking(true)}
-                                        onMouseUp={() => setIsPeeking(false)}
-                                        onTouchStart={() => setIsPeeking(true)}
-                                        onTouchEnd={() => setIsPeeking(false)}
-                                        className="bg-white text-slate-500 p-2 rounded-full shadow-lg border border-slate-100 hover:text-teal-600 active:scale-95 transition-all"
+                                        onClick={handleRevealAll}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 text-sm font-bold transition-colors"
                                     >
-                                        {isPeeking ? <Eye size={20} /> : <EyeOff size={20} />}
+                                        <Eye size={16} /> Reveal
                                     </button>
-                                    
-                                    {isMistake && (
-                                        <button 
-                                            onClick={handleManualCorrect}
-                                            className="bg-white text-green-600 p-2 rounded-full shadow-lg border border-green-100 hover:bg-green-50 active:scale-95 transition-all"
-                                        >
-                                            <CheckCircle size={20} />
-                                        </button>
-                                    )}
+                                    <button 
+                                        onClick={resetCurrent}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 text-sm font-bold transition-colors"
+                                    >
+                                        <RefreshCw size={16} /> Reset
+                                    </button>
+                                    <button 
+                                        onClick={handleNext}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold hover:bg-slate-800 transition-colors"
+                                    >
+                                        Next <ChevronRight size={16} />
+                                    </button>
                                 </div>
                              )}
                         </div>
                     );
                 })}
-                
-                {/* Spacer for bottom bar */}
-                <div className="h-32"></div>
             </div>
         )}
 
@@ -409,7 +471,7 @@ const MemorizationScreen = () => {
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-900 mb-2">MashaAllah!</h2>
                 <p className="text-slate-500 mb-8 max-w-xs">
-                    You have successfully recited {sessionAyahs.length} Ayahs from {selectedSurah?.englishName}.
+                    You have completed the revision session for {selectedSurah?.englishName}.
                 </p>
                 <button 
                     onClick={() => setSessionState('setup')}
@@ -426,7 +488,14 @@ const MemorizationScreen = () => {
       {sessionState === 'active' && (
         <div className="absolute bottom-0 w-full p-6 bg-gradient-to-t from-white via-white to-transparent z-30 flex justify-center pb-safe">
             <div className="flex items-center gap-6">
-                
+                <button 
+                   onClick={handlePrev}
+                   disabled={currentIndex === 0}
+                   className="w-12 h-12 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center disabled:opacity-30"
+                >
+                    <ChevronLeft size={24} />
+                </button>
+
                 {isRecording ? (
                     <button 
                         onClick={stopRecording}
@@ -446,6 +515,13 @@ const MemorizationScreen = () => {
                         <Mic size={32} className="group-hover:text-teal-400 transition-colors" />
                     </button>
                 )}
+
+                <button 
+                   onClick={handleNext}
+                   className="w-12 h-12 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-teal-600 hover:border-teal-200 flex items-center justify-center"
+                >
+                    <ArrowRight size={24} />
+                </button>
             </div>
             
             {/* Helper Text */}
