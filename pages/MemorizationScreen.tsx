@@ -29,6 +29,8 @@ const removeDiacritics = (text: string) => {
     return text.normalize("NFD").replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, "");
 };
 
+const BASMALAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ";
+
 const MemorizationScreen = () => {
   // Data State
   const [surahs, setSurahs] = useState<Surah[]>([]);
@@ -95,14 +97,27 @@ const MemorizationScreen = () => {
   }, [currentIndex, sessionState]);
 
   const handleStartSession = () => {
-    const filtered = ayahs.filter(a => a.numberInSurah >= rangeStart && a.numberInSurah <= rangeEnd);
+    // Process Ayahs: Clean Basmalah if needed
+    const processedAyahs = ayahs.map(a => {
+        let text = a.text;
+        // If it's the first Ayah of a Surah (and not Al-Fatiha), remove the prepended Basmalah
+        if (selectedSurah?.number !== 1 && a.numberInSurah === 1) {
+             // Check if it starts with Basmalah (accounting for potential whitespace)
+             if (text.startsWith(BASMALAH)) {
+                 text = text.replace(BASMALAH, '').trim();
+             }
+        }
+        return { ...a, text };
+    });
+
+    const filtered = processedAyahs.filter(a => a.numberInSurah >= rangeStart && a.numberInSurah <= rangeEnd);
     setSessionAyahs(filtered);
     
     // Initialize Progress: Split words
     const initialProgress = filtered.map((a) => ({
         ayahNumber: a.numberInSurah,
         isCompleted: false,
-        words: a.text.split(' ').map((word, idx) => ({
+        words: a.text.split(' ').filter(w => w.trim().length > 0).map((word, idx) => ({
             id: idx,
             text: word,
             cleanText: removeDiacritics(word),
@@ -160,7 +175,7 @@ const MemorizationScreen = () => {
                   // Allow for slight differences (e.g. ignoring Alef types)
                   const tNorm = tw.replace(/[أإآ]/g, 'ا');
                   const wNorm = w.cleanText.replace(/[أإآ]/g, 'ا');
-                  return tNorm === wNorm || (wNorm.length > 3 && tNorm.includes(wNorm));
+                  return tNorm === wNorm || (wNorm.length > 2 && tNorm.includes(wNorm));
               });
 
               if (isMatch) {
@@ -496,7 +511,7 @@ const MemorizationScreen = () => {
                              </div>
 
                              {/* Word-by-Word Rendering */}
-                             <div className="flex flex-wrap flex-row-reverse gap-x-2 gap-y-4 justify-center py-4 px-2" dir="rtl">
+                             <div className="flex flex-wrap gap-x-2 gap-y-4 justify-center py-4 px-2" dir="rtl">
                                 {ayahProgress?.words.map((w, wIdx) => {
                                     // Status Logic
                                     const isRevealed = w.status === 'revealed';
