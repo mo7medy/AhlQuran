@@ -15,13 +15,22 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// Enable CORS for all domains
+app.use(cors({
+    origin: '*', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // --- Database Connection ---
 const connectDB = async () => {
+  // Check if we are already connected (Vercel hot-loading optimization)
+  if (mongoose.connection.readyState >= 1) return;
+
   try {
     if (!process.env.MONGO_URI) {
-      console.warn("⚠️ MONGO_URI not found in .env file. Database features will fail.");
+      console.warn("⚠️ MONGO_URI not found.");
     } else {
       await mongoose.connect(process.env.MONGO_URI);
       console.log('✅ MongoDB Connected');
@@ -161,25 +170,11 @@ app.put('/api/users/profile', async (req, res) => {
   }
 });
 
-app.get('/api/teachers', async (req, res) => {
-    try {
-        const teachers = await User.find({ role: 'teacher' }).select('-password');
-        res.json(teachers);
-    } catch (err) {
-        res.status(500).send('Server Error');
-    }
-});
-
-// --- SERVE FRONTEND IN PRODUCTION ---
-if (process.env.NODE_ENV === 'production') {
-  // Set static folder
-  app.use(express.static(path.join(__dirname, '../dist')));
-
-  // Any route not caught by /api goes to index.html
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../dist', 'index.html'));
-  });
+// Start Server (Only if not in Vercel/Serverless environment)
+const PORT = process.env.PORT || 5000;
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 }
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// Export for Vercel
+export default app;

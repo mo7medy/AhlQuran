@@ -15,6 +15,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | Teacher | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper to determine API URL
+  // Safely checks import.meta.env and process.env to prevent crashes
+  const getApiUrl = (endpoint: string) => {
+    const metaEnv = (import.meta as any).env || {};
+    const processEnv = (typeof process !== 'undefined' ? process.env : {}) as any;
+    
+    // Priority: VITE_API_URL (Amplify/Vercel) -> Empty String (Relative Path for Proxy)
+    const baseUrl = metaEnv.VITE_API_URL || processEnv.VITE_API_URL || '';
+    return `${baseUrl}${endpoint}`;
+  };
+
   // Load User from Token on Mount
   useEffect(() => {
     const loadUser = async () => {
@@ -25,7 +36,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       try {
-        const res = await fetch('/api/auth/me', {
+        const res = await fetch(getApiUrl('/api/auth/me'), {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -49,16 +60,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (role: 'student' | 'teacher', formData?: any) => {
     try {
-        // If formData has a password, it's a real login/signup
-        // If it's a mock login from the previous code (without password field handling in some places), 
-        // we might fail here. But AuthScreen uses password now.
-        
-        const isSignup = !!formData.name; // Simple heuristic: Name is present on signup
+        const isSignup = !!formData.name;
         const endpoint = isSignup ? '/api/auth/register' : '/api/auth/login';
+        const url = getApiUrl(endpoint);
 
         const payload = { ...formData, role };
         
-        const res = await fetch(endpoint, {
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -74,25 +82,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(data.user);
     } catch (err) {
         console.error(err);
-        alert("Authentication Failed. Please check console or ensure Backend is running.");
-        // Fallback to mock for demo purposes if backend fails
-        fallbackMockLogin(role, formData);
+        alert(err instanceof Error ? err.message : "Authentication Failed");
     }
   };
-
-  const fallbackMockLogin = (role: string, formData: any) => {
-      // KEEPING THIS ONLY SO APP DOESN'T BREAK IF YOU DON'T HAVE MONGO RUNNING
-      console.warn("Falling back to Mock Login");
-      const baseUser: User = {
-        uid: 'user_' + Date.now(),
-        email: formData?.email || 'user@demo.com',
-        displayName: formData?.name || 'Demo User',
-        role: role as any,
-        memorizedAyahs: 0,
-        avatarUrl: `https://ui-avatars.com/api/?name=Demo+User`
-      };
-      setUser(baseUser);
-  }
 
   const logout = () => {
     setUser(null);
@@ -101,13 +93,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateProfile = async (data: Partial<Teacher>) => {
     if (!user) return;
-    
-    // Optimistic Update
     setUser({ ...user, ...data });
 
     try {
         const token = localStorage.getItem('token');
-        await fetch('/api/users/profile', {
+        await fetch(getApiUrl('/api/users/profile'), {
             method: 'PUT',
             headers: { 
                 'Content-Type': 'application/json',
@@ -133,4 +123,4 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}
